@@ -1,0 +1,94 @@
+from iac_converter.generator.terraform import generate_terraform
+from iac_converter.parser.yaml_parser import parse_yaml
+
+
+def test_yaml_to_terraform():
+
+    source = """
+version: "1"
+
+terraform:
+  required_version: ">= 1.6.0"
+
+providers:
+  aws:
+    properties:
+      region: ap-south-1
+
+resources:
+  - type: aws_s3_bucket
+    name: data
+    properties:
+      bucket: company-data
+      tags:
+        Environment: dev
+        Owner: sreenu
+"""
+
+    project = parse_yaml(source)
+
+    terraform = generate_terraform(project)
+
+    assert 'terraform {' in terraform
+    assert 'required_version = ">= 1.6.0"' in terraform
+
+    assert 'provider "aws" {' in terraform
+    assert 'region = "ap-south-1"' in terraform
+
+    assert 'resource "aws_s3_bucket" "data" {' in terraform
+    assert 'bucket = "company-data"' in terraform
+
+
+def test_yaml_to_terraform_reference():
+
+    source = """
+resources:
+  - type: aws_s3_bucket
+    name: data
+    properties:
+      bucket: company-data
+
+  - type: aws_s3_bucket_policy
+    name: policy
+    properties:
+      bucket:
+        reference:
+          resource_type: aws_s3_bucket
+          resource_name: data
+          attribute: id
+"""
+
+    project = parse_yaml(source)
+
+    terraform = generate_terraform(project)
+
+    assert (
+        "bucket = aws_s3_bucket.data.id"
+        in terraform
+    )
+
+def test_yaml_to_terraform_expression():
+
+    source = """
+variables:
+  - name: bucket_name
+    type: string
+    default: company-data
+
+resources:
+  - type: aws_s3_bucket
+    name: data
+    properties:
+      bucket:
+        expression: var.bucket_name
+"""
+
+    project = parse_yaml(source)
+
+    terraform = generate_terraform(project)
+
+    assert "type = string" in terraform
+    assert 'default = "company-data"' in terraform
+    assert "bucket = var.bucket_name" in terraform
+
+   

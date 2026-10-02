@@ -1,0 +1,169 @@
+from typing import Any
+
+import yaml
+
+from iac_converter.ir import (
+    DataSource,
+    Literal,
+    Output,
+    ProjectIR,
+    Provider,
+    RawExpression,
+    Reference,
+    Resource,
+    Variable,
+)
+
+from iac_converter.schema.yaml_schema import YAMLProject
+
+
+class YAMLParseError(ValueError):
+    """Raised when YAML cannot be converted into the project schema."""
+
+
+def load_yaml(source: str) -> dict[str, Any]:
+    try:
+        data = yaml.safe_load(source)
+    except yaml.YAMLError as exc:
+        raise YAMLParseError(f"Invalid YAML: {exc}") from exc
+
+    if data is None:
+        return {}
+
+    if not isinstance(data, dict):
+        raise YAMLParseError(
+            "YAML project root must be an object"
+        )
+
+    return data
+
+
+def parse_yaml(source: str) -> ProjectIR:
+    raw = load_yaml(source)
+
+    try:
+        project = YAMLProject.model_validate(raw)
+    except Exception as exc:
+        raise YAMLParseError(str(exc)) from exc
+
+    return _to_ir(project)
+
+
+def _to_ir(project: YAMLProject) -> ProjectIR:
+    return ProjectIR(
+        version=project.version,
+        terraform=project.terraform,
+        providers=_parse_providers(project),
+        variables=_parse_variables(project),
+        resources=_parse_resources(project),
+        data_sources=_parse_data_sources(project),
+        outputs=_parse_outputs(project),
+        locals=project.locals,
+    )
+
+
+def _parse_providers(project: YAMLProject) -> list[Provider]:
+    return [
+        Provider(
+            name=name,
+            alias=provider.alias,
+            configuration=provider.properties,
+        )
+        for name, provider in project.providers.items()
+    ]
+
+
+def _parse_variables(project: YAMLProject) -> list[Variable]:
+    return [
+        Variable(
+            name=variable.name,
+            type=_convert_value(variable.type),
+            description=variable.description,
+            default=_convert_value(variable.default),
+            sensitive=variable.sensitive,
+            nullable=variable.nullable,
+        )
+        for variable in project.variables
+    ]
+
+
+def _parse_resources(project: YAMLProject) -> list[Resource]:
+    return [
+        Resource(
+            type=resource.type,
+            name=resource.name,
+            attributes=_convert_value(resource.properties),
+            count=_convert_value(resource.count),
+            for_each=_convert_value(resource.for_each),
+            depends_on=_convert_value(resource.depends_on),
+            lifecycle=_convert_value(resource.lifecycle),
+        )
+        for resource in project.resources
+    ]
+
+
+def _parse_data_sources(project: YAMLProject) -> list[DataSource]:
+    return [
+        DataSource(
+            type=data_source.type,
+            name=data_source.name,
+            attributes=_convert_value(data_source.properties),
+        )
+        for data_source in project.data_sources
+    ]
+
+
+def _parse_outputs(project: YAMLProject) -> list[Output]:
+    return [
+        Output(
+            name=output.name,
+            value=_convert_value(output.value),
+            description=output.description,
+            sensitive=output.sensitive,
+        )
+        for output in project.outputs
+    ]
+
+
+def _convert_value(value: Any) -> Any:
+    if value is None:
+        return None
+
+    if isinstance(value, dict):
+
+        if set(value.keys()) == {"expression"}:
+            expression = value["expression"]
+
+            if not isinstance(expression, str):
+                raise YAMLParseError(
+                    "'expression' must be a string"
+                )
+
+            return RawExpression(expression)
+
+        if set(value.keys()) == {"reference"}:
+            reference = value["reference"]
+
+            if not isinstance(reference, dict):
+                raise YAMLParseError(
+                    "'reference' must be an object"
+                )
+
+            return Reference(
+                resource_type=reference["resource_type"],
+                resource_name=reference["resource_name"],
+                attribute=reference.get("attribute"),
+            )
+
+        return {
+            key: _convert_value(item)
+            for key, item in value.items()
+        }
+
+    if isinstance(value, list):
+        return [
+            _convert_value(item)
+            for item in value
+        ]
+
+    return Literal(value)
