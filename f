@@ -172,3 +172,16 @@ Provider schemas
 API
 ⬇
 Terraform validate / plan / apply
+
+-----------next target ----------
+So the next milestone would be:
+
+M3 — Advanced Terraform blocks
+
+Provisioner connection
+Dynamic blocks
+Nested blocks
+More expression preservation
+Stronger round-trip tests
+
+I'd do connection blocks next, one feature at a time just like we've been doing.
