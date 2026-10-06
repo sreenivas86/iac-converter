@@ -1,3 +1,4 @@
+
 from typing import Any
 
 import yaml
@@ -97,9 +98,40 @@ def _parse_resources(project: YAMLProject) -> list[Resource]:
             for_each=_convert_value(resource.for_each),
             depends_on=_convert_value(resource.depends_on),
             lifecycle=_convert_value(resource.lifecycle),
+            provisioners=_parse_provisioners(resource.provisioners),
         )
         for resource in project.resources
     ]
+
+
+def _parse_provisioners(
+    provisioners: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    converted: list[dict[str, Any]] = []
+
+    for provisioner in provisioners:
+        provisioner_type = provisioner.get("type")
+
+        if not isinstance(provisioner_type, str):
+            raise YAMLParseError(
+                "Provisioner 'type' must be a string"
+            )
+
+        properties = provisioner.get("properties", {})
+
+        if not isinstance(properties, dict):
+            raise YAMLParseError(
+                "Provisioner 'properties' must be an object"
+            )
+
+        converted.append(
+            {
+                "type": provisioner_type,
+                "properties": _convert_value(properties),
+            }
+        )
+
+    return converted
 
 
 def _parse_data_sources(project: YAMLProject) -> list[DataSource]:
@@ -130,7 +162,6 @@ def _convert_value(value: Any) -> Any:
         return None
 
     if isinstance(value, dict):
-
         if set(value.keys()) == {"expression"}:
             expression = value["expression"]
 

@@ -1,3 +1,4 @@
+
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,6 +21,7 @@ class YAMLResource(BaseModel):
     for_each: Any | None = None
     depends_on: list[Any] = Field(default_factory=list)
     lifecycle: dict[str, Any] = Field(default_factory=dict)
+    provisioners: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class YAMLVariable(BaseModel):

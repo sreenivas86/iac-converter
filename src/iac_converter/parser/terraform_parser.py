@@ -1,5 +1,3 @@
-# src/iac_converter/parser/terraform_parser.py
-
 from __future__ import annotations
 
 import io
@@ -85,7 +83,7 @@ def _parse_providers(
                     configuration={
                         key: _convert_value(value)
                         for key, value in configuration.items()
-                        if key != "alias"
+                        if key not in {"alias", "__is_block__"}
                     },
                 )
             )
@@ -183,10 +181,50 @@ def _parse_resources(
                         lifecycle=_convert_block(
                             configuration.get("lifecycle")
                         ),
+                        provisioners=_parse_provisioners(
+                            configuration.get("provisioner")
+                        ),
                     )
                 )
 
     return resources
+
+
+def _parse_provisioners(
+    value: Any,
+) -> list[dict[str, Any]]:
+    """Convert Terraform provisioner blocks into IR dictionaries."""
+    if value is None:
+        return []
+
+    if not isinstance(value, list):
+        return []
+
+    provisioners: list[dict[str, Any]] = []
+
+    for block in value:
+        if not isinstance(block, dict):
+            continue
+
+        for provisioner_type, configuration in block.items():
+            if provisioner_type == "__is_block__":
+                continue
+
+            if not isinstance(configuration, dict):
+                configuration = {}
+
+            provisioners.append(
+                {
+                    "type": _strip_hcl_quotes(provisioner_type),
+                    "properties": {
+                        key: _convert_value(item)
+                        for key, item in configuration.items()
+                        if key != "__is_block__"
+                    },
+                }
+            )
+
+    return provisioners
 
 
 def _parse_resource_attributes(
@@ -199,6 +237,7 @@ def _parse_resource_attributes(
         "lifecycle",
         "provisioner",
         "connection",
+        "__is_block__",
     }
 
     return {
@@ -232,7 +271,11 @@ def _parse_data_sources(
                         attributes={
                             key: _convert_value(value)
                             for key, value in configuration.items()
+                            if key != "__is_block__"
                         },
+                        depends_on=_convert_value(
+                            configuration.get("depends_on", [])
+                        ),
                     )
                 )
 
@@ -287,6 +330,9 @@ def _parse_locals(
     for block in blocks:
         if isinstance(block, dict):
             for key, value in block.items():
+                if key == "__is_block__":
+                    continue
+
                 result[key] = _convert_value(value)
 
     return result
@@ -304,7 +350,11 @@ def _convert_block(value: Any) -> dict[str, Any]:
                 for key, item in value[0].items()
                 if key != "__is_block__"
             }
-        return {str(index): _convert_value(item) for index, item in enumerate(value)}
+
+        return {
+            str(index): _convert_value(item)
+            for index, item in enumerate(value)
+        }
 
     if isinstance(value, dict):
         return {
@@ -329,7 +379,10 @@ def _convert_value(value: Any) -> Any:
         }
 
     if isinstance(value, list):
-        return [_convert_value(item) for item in value]
+        return [
+            _convert_value(item)
+            for item in value
+        ]
 
     if isinstance(value, str):
         return _convert_string(value)
@@ -342,15 +395,24 @@ def _convert_value(value: Any) -> Any:
 
 def _convert_string(value: str) -> Any:
     """Convert an HCL string/expression into the IR."""
-    value = _strip_hcl_quotes(value)
+    original_value = value.strip()
+    value = _strip_hcl_quotes(original_value)
 
-    expression = _extract_expression(value)
+    # Preserve Terraform interpolation strings such as:
+    # "echo ${self.id}"
+    # "arn:${var.region}:${var.account_id}"
+    if "${" in value:
+        expression = _extract_expression(value)
 
-    if expression is not None:
-        reference = _parse_reference(expression)
-        if reference is not None:
-            return reference
-        return RawExpression(expression)
+        if expression is not None:
+            reference = _parse_reference(expression)
+
+            if reference is not None:
+                return reference
+
+            return RawExpression(expression)
+
+        return RawExpression(original_value)
 
     return Literal(value)
 
@@ -358,26 +420,43 @@ def _convert_string(value: str) -> Any:
 def _extract_expression(value: str) -> str | None:
     if value.startswith("${") and value.endswith("}"):
         return value[2:-1].strip()
+
     return None
 
 
 def _parse_reference(expression: str) -> Reference | None:
-    """Parse only simple resource traversals.
+    """Parse simple Terraform resource/data references.
 
     Supported:
       aws_s3_bucket.data
       aws_s3_bucket.data.id
 
+    Variable, local, and Terraform meta-object references such as:
+      var.bucket_name
+      local.bucket_prefix
+      each.value
+
+    are expressions, not resource references, and therefore
+    remain RawExpression.
+
     Complex expressions remain RawExpression.
     """
     expression = expression.strip()
 
-    if any(char in expression for char in ("?", ":", "(", ")", "[", "]", ",")):
+    if any(
+        char in expression
+        for char in ("?", ":", "(", ")", "[", "]", ",")
+    ):
         return None
 
     parts = expression.split(".")
 
     if len(parts) not in (2, 3):
+        return None
+
+    # Terraform variable, local, and meta-object references
+    # are not resource references.
+    if parts[0] in {"var", "local", "each"}:
         return None
 
     resource_type = parts[0]
@@ -438,6 +517,7 @@ def _unwrap_optional_bool(
     value = _unwrap_literal(value)
 
     return bool(value)
+
 
 def _unwrap_string(value: Any) -> Any:
     if not isinstance(value, str):

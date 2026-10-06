@@ -132,3 +132,43 @@ generate_terraform_project()
   save_project()
       ↓
 Terraform files
+
+
+--------------------------------------------- 06-10-2026
+
+
+
+
+✅ Basic resources
+✅ Providers
+✅ Variables
+✅ Outputs
+✅ Expressions
+✅ References
+✅ Project directories
+✅ ZIP projects
+✅ Terraform → YAML round trip
+✅ YAML → Terraform round trip
+⬇
+NEXT
+Data sources + locals
+⬇
+depends_on
+⬇
+count / for_each
+⬇
+provider aliases
+⬇
+lifecycle
+⬇
+nested blocks
+⬇
+complex expressions
+⬇
+dynamic blocks
+⬇
+Provider schemas
+⬇
+API
+⬇
+Terraform validate / plan / apply
