@@ -8,6 +8,7 @@ from .provider import Provider
 from .reference import Reference
 from .resource import Resource
 from .variable import Variable
+from .block import Block
 
 __all__ = [
     "DataSource",

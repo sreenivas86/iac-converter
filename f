@@ -185,3 +185,23 @@ More expression preservation
 Stronger round-trip tests
 
 I'd do connection blocks next, one feature at a time just like we've been doing.
+
+M3.2-- terraform nested blocks
+Our current IR handles:
+
+resources
+attributes
+count
+for_each
+depends_on
+lifecycle
+provisioners
+provisioner connections
+providers
+variables
+data sources
+outputs
+locals
+expressions
+references
+But it doesn't yet have a first-class representation for arbitrary nested blocks.

@@ -11,12 +11,22 @@ class YAMLProvider(BaseModel):
     properties: dict[str, Any] = Field(default_factory=dict)
 
 
+class YAMLBlock(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: str
+    labels: list[str] = Field(default_factory=list)
+    properties: dict[str, Any] = Field(default_factory=dict)
+    blocks: list["YAMLBlock"] = Field(default_factory=list)
+
+
 class YAMLResource(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: str
     name: str
     properties: dict[str, Any] = Field(default_factory=dict)
+    blocks: list[YAMLBlock] = Field(default_factory=list)
     count: Any | None = None
     for_each: Any | None = None
     depends_on: list[Any] = Field(default_factory=list)
@@ -69,3 +79,4 @@ class YAMLProject(BaseModel):
     outputs: list[YAMLOutput] = Field(default_factory=list)
 
     locals: dict[str, Any] = Field(default_factory=dict)
+

@@ -1,10 +1,10 @@
-
 from __future__ import annotations
 
 import json
 from typing import Any
 
 from iac_converter.ir import (
+    Block,
     DataSource,
     Literal,
     Output,
@@ -60,8 +60,14 @@ class TerraformGenerator:
     # Top-level blocks
     # ------------------------------------------------------------------
 
-    def _terraform_block(self, configuration: dict[str, Any]) -> str:
-        body = self._render_arguments(configuration, level=1)
+    def _terraform_block(
+        self,
+        configuration: dict[str, Any],
+    ) -> str:
+        body = self._render_arguments(
+            configuration,
+            level=1,
+        )
 
         return self._block(
             header="terraform",
@@ -69,13 +75,19 @@ class TerraformGenerator:
             level=0,
         )
 
-    def _provider_block(self, provider: Provider) -> str:
+    def _provider_block(
+        self,
+        provider: Provider,
+    ) -> str:
         arguments = dict(provider.configuration)
 
         if provider.alias is not None:
             arguments["alias"] = provider.alias
 
-        body = self._render_arguments(arguments, level=1)
+        body = self._render_arguments(
+            arguments,
+            level=1,
+        )
 
         return self._block(
             header=f'provider "{provider.name}"',
@@ -83,14 +95,19 @@ class TerraformGenerator:
             level=0,
         )
 
-    def _variable_block(self, variable: Variable) -> str:
+    def _variable_block(
+        self,
+        variable: Variable,
+    ) -> str:
         arguments: list[tuple[str, Any]] = []
 
         if variable.type is not None:
             arguments.append(("type", variable.type))
 
         if variable.description is not None:
-            arguments.append(("description", variable.description))
+            arguments.append(
+                ("description", variable.description)
+            )
 
         if variable.default is not None:
             arguments.append(("default", variable.default))
@@ -113,7 +130,10 @@ class TerraformGenerator:
             level=0,
         )
 
-    def _locals_block(self, locals_values: dict[str, Any]) -> str:
+    def _locals_block(
+        self,
+        locals_values: dict[str, Any],
+    ) -> str:
         body = self._render_arguments(
             locals_values,
             level=1,
@@ -126,7 +146,10 @@ class TerraformGenerator:
             level=0,
         )
 
-    def _data_source_block(self, data_source: DataSource) -> str:
+    def _data_source_block(
+        self,
+        data_source: DataSource,
+    ) -> str:
         body = self._render_arguments(
             data_source.attributes,
             level=1,
@@ -145,45 +168,61 @@ class TerraformGenerator:
             level=0,
         )
 
-    def _resource_block(self, resource: Resource) -> str:
+    def _resource_block(
+        self,
+        resource: Resource,
+    ) -> str:
         lines: list[str] = []
 
-        lines.extend(
-            self._render_arguments(
-                resource.attributes,
-                level=1,
-            ).splitlines()
+        # Regular resource attributes.
+        attributes = self._render_arguments(
+            resource.attributes,
+            level=1,
         )
 
+        if attributes:
+            lines.extend(attributes.splitlines())
+
+        # Nested resource blocks.
+        for block in resource.blocks:
+            lines.append(
+                self._render_block(
+                    block,
+                    level=1,
+                )
+            )
+
+        # Meta arguments.
         if resource.count is not None:
-            lines.extend(
+            lines.append(
                 self._render_argument(
                     "count",
                     resource.count,
                     level=1,
                     expression=True,
-                ).splitlines()
+                )
             )
 
         if resource.for_each is not None:
-            lines.extend(
+            lines.append(
                 self._render_argument(
                     "for_each",
                     resource.for_each,
                     level=1,
                     expression=True,
-                ).splitlines()
+                )
             )
 
         if resource.depends_on:
-            lines.extend(
+            lines.append(
                 self._render_argument(
                     "depends_on",
                     resource.depends_on,
                     level=1,
-                ).splitlines()
+                )
             )
 
+        # Lifecycle block.
         if resource.lifecycle:
             lines.append(
                 self._render_lifecycle_block(
@@ -192,6 +231,7 @@ class TerraformGenerator:
                 )
             )
 
+        # Provisioners.
         for provisioner in resource.provisioners:
             lines.append(
                 self._render_provisioner_block(
@@ -210,7 +250,10 @@ class TerraformGenerator:
             level=0,
         )
 
-    def _output_block(self, output: Output) -> str:
+    def _output_block(
+        self,
+        output: Output,
+    ) -> str:
         arguments: dict[str, Any] = {
             "value": output.value,
         }
@@ -233,6 +276,62 @@ class TerraformGenerator:
             header=f'output "{output.name}"',
             body=body,
             level=0,
+        )
+
+    # ------------------------------------------------------------------
+    # Nested blocks
+    # ------------------------------------------------------------------
+
+    def _render_block(
+        self,
+        block: Block,
+        level: int,
+    ) -> str:
+        """Render a nested Terraform block recursively."""
+        indentation = self._indent(level)
+
+        header = block.type
+
+        if block.labels:
+            header += " " + " ".join(
+                json.dumps(label)
+                for label in block.labels
+            )
+
+        lines: list[str] = []
+
+        # Block attributes.
+        if block.attributes:
+            attributes = self._render_arguments(
+                block.attributes,
+                level=level + 1,
+            )
+
+            if attributes:
+                lines.extend(
+                    attributes.splitlines()
+                )
+
+        # Child nested blocks.
+        for child in block.blocks:
+            lines.append(
+                self._render_block(
+                    child,
+                    level=level + 1,
+                )
+            )
+
+        body = "\n".join(
+            line for line in lines if line
+        )
+
+        if not body:
+            return f"{indentation}{header} {{}}"
+
+        return (
+            f"{indentation}{header} {{\n"
+            f"{body}\n"
+            f"{indentation}}}"
         )
 
     # ------------------------------------------------------------------
@@ -331,7 +430,10 @@ class TerraformGenerator:
                 "Provisioner 'type' must be a string"
             )
 
-        properties = provisioner.get("properties", {})
+        properties = provisioner.get(
+            "properties",
+            {},
+        )
 
         if not isinstance(properties, dict):
             raise TerraformGenerationError(
@@ -340,13 +442,53 @@ class TerraformGenerator:
 
         indentation = self._indent(level)
 
+        lines: list[str] = [
+            f'{indentation}provisioner "{provisioner_type}" {{'
+        ]
+
+        if properties:
+            lines.append(
+                self._render_arguments(
+                    properties,
+                    level=level + 1,
+                )
+            )
+
+        connection = provisioner.get("connection")
+
+        if connection is not None:
+            if not isinstance(connection, dict):
+                raise TerraformGenerationError(
+                    "Provisioner 'connection' must be an object"
+                )
+
+            lines.append(
+                self._render_connection_block(
+                    connection,
+                    level=level + 1,
+                )
+            )
+
+        lines.append(
+            f"{indentation}}}"
+        )
+
+        return "\n".join(lines)
+
+    def _render_connection_block(
+        self,
+        connection: dict[str, Any],
+        level: int,
+    ) -> str:
+        indentation = self._indent(level)
+
         body = self._render_arguments(
-            properties,
+            connection,
             level=level + 1,
         )
 
         return (
-            f'{indentation}provisioner "{provisioner_type}" {{\n'
+            f"{indentation}connection {{\n"
             f"{body}\n"
             f"{indentation}}}"
         )
@@ -442,7 +584,10 @@ class TerraformGenerator:
             f"Unsupported literal type: {type(value).__name__}"
         )
 
-    def _render_object(self, value: dict[str, Any]) -> str:
+    def _render_object(
+        self,
+        value: dict[str, Any],
+    ) -> str:
         if not value:
             return "{}"
 
@@ -479,8 +624,15 @@ class TerraformGenerator:
 
         return "[" + ", ".join(rendered_items) + "]"
 
-    def _render_key(self, key: str) -> str:
-        if key.replace("_", "a").isalnum() and not key[0].isdigit():
+    def _render_key(
+        self,
+        key: str,
+    ) -> str:
+        if (
+            key
+            and key.replace("_", "a").isalnum()
+            and not key[0].isdigit()
+        ):
             return key
 
         return json.dumps(key)
@@ -519,10 +671,14 @@ class TerraformGenerator:
             for line in value.splitlines()
         )
 
-    def _indent(self, level: int) -> str:
+    def _indent(
+        self,
+        level: int,
+    ) -> str:
         return " " * (self.indent * level)
 
 
-def generate_terraform(project: ProjectIR) -> str:
+def generate_terraform(
+    project: ProjectIR,
+) -> str:
     return TerraformGenerator().generate(project)
-

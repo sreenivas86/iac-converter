@@ -1,5 +1,3 @@
-# src/iac_converter/ir/reference.py
-
 from dataclasses import dataclass
 
 from .expression import Expression
@@ -10,9 +8,10 @@ class Reference(Expression):
     """
     Reference to another Terraform object.
 
-    Example:
+    Examples:
 
         aws_s3_bucket.data.id
+        aws_s3_bucket.data
     """
 
     resource_type: str

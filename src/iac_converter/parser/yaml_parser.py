@@ -4,6 +4,7 @@ from typing import Any
 import yaml
 
 from iac_converter.ir import (
+    Block,
     DataSource,
     Literal,
     Output,
@@ -94,6 +95,7 @@ def _parse_resources(project: YAMLProject) -> list[Resource]:
             type=resource.type,
             name=resource.name,
             attributes=_convert_value(resource.properties),
+            blocks=_parse_blocks(resource.blocks),
             count=_convert_value(resource.count),
             for_each=_convert_value(resource.for_each),
             depends_on=_convert_value(resource.depends_on),
@@ -102,6 +104,22 @@ def _parse_resources(project: YAMLProject) -> list[Resource]:
         )
         for resource in project.resources
     ]
+
+
+def _parse_blocks(blocks: list[Any]) -> list[Block]:
+    converted: list[Block] = []
+
+    for block in blocks:
+        converted.append(
+            Block(
+                type=block.type,
+                labels=list(block.labels),
+                attributes=_convert_value(block.properties),
+                blocks=_parse_blocks(block.blocks),
+            )
+        )
+
+    return converted
 
 
 def _parse_provisioners(
@@ -124,12 +142,24 @@ def _parse_provisioners(
                 "Provisioner 'properties' must be an object"
             )
 
-        converted.append(
-            {
-                "type": provisioner_type,
-                "properties": _convert_value(properties),
-            }
-        )
+        converted_provisioner: dict[str, Any] = {
+            "type": provisioner_type,
+            "properties": _convert_value(properties),
+        }
+
+        connection = provisioner.get("connection")
+
+        if connection is not None:
+            if not isinstance(connection, dict):
+                raise YAMLParseError(
+                    "Provisioner 'connection' must be an object"
+                )
+
+            converted_provisioner["connection"] = _convert_value(
+                connection
+            )
+
+        converted.append(converted_provisioner)
 
     return converted
 
@@ -198,3 +228,4 @@ def _convert_value(value: Any) -> Any:
         ]
 
     return Literal(value)
+

@@ -6,6 +6,7 @@ from typing import Any
 import hcl2
 
 from iac_converter.ir import (
+    Block,
     DataSource,
     Literal,
     Output,
@@ -132,7 +133,9 @@ def _parse_variables(
     return variables
 
 
-def _parse_validation(value: Any) -> list[dict[str, Any]]:
+def _parse_validation(
+    value: Any,
+) -> list[dict[str, Any]]:
     if value is None:
         return []
 
@@ -169,6 +172,9 @@ def _parse_resources(
                         attributes=_parse_resource_attributes(
                             configuration
                         ),
+                        blocks=_parse_nested_blocks(
+                            configuration
+                        ),
                         count=_convert_value(
                             configuration.get("count")
                         ),
@@ -188,6 +194,57 @@ def _parse_resources(
                 )
 
     return resources
+
+
+def _parse_nested_blocks(
+    configuration: dict[str, Any],
+) -> list[Block]:
+    blocks: list[Block] = []
+
+    meta_arguments = {
+        "count",
+        "for_each",
+        "depends_on",
+        "lifecycle",
+        "provisioner",
+        "connection",
+        "__is_block__",
+    }
+
+    for key, value in configuration.items():
+        if key in meta_arguments:
+            continue
+
+        if not isinstance(value, list):
+            continue
+
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+
+            if "__is_block__" not in item:
+                continue
+
+            blocks.append(
+                Block(
+                    type=_strip_hcl_quotes(key),
+                    attributes=_parse_block_attributes(item),
+                    blocks=_parse_nested_blocks(item),
+                )
+            )
+
+    return blocks
+
+
+def _parse_block_attributes(
+    configuration: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        key: _convert_value(value)
+        for key, value in configuration.items()
+        if key != "__is_block__"
+        and not _is_nested_block_value(value)
+    }
 
 
 def _parse_provisioners(
@@ -213,16 +270,22 @@ def _parse_provisioners(
             if not isinstance(configuration, dict):
                 configuration = {}
 
-            provisioners.append(
-                {
-                    "type": _strip_hcl_quotes(provisioner_type),
-                    "properties": {
-                        key: _convert_value(item)
-                        for key, item in configuration.items()
-                        if key != "__is_block__"
-                    },
-                }
-            )
+            provisioner: dict[str, Any] = {
+                "type": _strip_hcl_quotes(provisioner_type),
+                "properties": {},
+            }
+
+            for key, item in configuration.items():
+                if key == "__is_block__":
+                    continue
+
+                if key == "connection":
+                    provisioner["connection"] = _convert_block(item)
+                    continue
+
+                provisioner["properties"][key] = _convert_value(item)
+
+            provisioners.append(provisioner)
 
     return provisioners
 
@@ -244,7 +307,20 @@ def _parse_resource_attributes(
         key: _convert_value(value)
         for key, value in configuration.items()
         if key not in meta_arguments
+        and not _is_nested_block_value(value)
     }
+
+
+def _is_nested_block_value(
+    value: Any,
+) -> bool:
+    if not isinstance(value, list):
+        return False
+
+    return any(
+        isinstance(item, dict) and "__is_block__" in item
+        for item in value
+    )
 
 
 def _parse_data_sources(
@@ -338,7 +414,9 @@ def _parse_locals(
     return result
 
 
-def _convert_block(value: Any) -> dict[str, Any]:
+def _convert_block(
+    value: Any,
+) -> dict[str, Any]:
     """Convert an HCL block/object into a plain IR dictionary."""
     if value is None:
         return {}
@@ -366,7 +444,9 @@ def _convert_block(value: Any) -> dict[str, Any]:
     return {}
 
 
-def _convert_value(value: Any) -> Any:
+def _convert_value(
+    value: Any,
+) -> Any:
     """Convert python-hcl2 values into IR values."""
     if value is None:
         return None
@@ -393,7 +473,9 @@ def _convert_value(value: Any) -> Any:
     return Literal(value)
 
 
-def _convert_string(value: str) -> Any:
+def _convert_string(
+    value: str,
+) -> Any:
     """Convert an HCL string/expression into the IR."""
     original_value = value.strip()
     value = _strip_hcl_quotes(original_value)
@@ -417,14 +499,18 @@ def _convert_string(value: str) -> Any:
     return Literal(value)
 
 
-def _extract_expression(value: str) -> str | None:
+def _extract_expression(
+    value: str,
+) -> str | None:
     if value.startswith("${") and value.endswith("}"):
         return value[2:-1].strip()
 
     return None
 
 
-def _parse_reference(expression: str) -> Reference | None:
+def _parse_reference(
+    expression: str,
+) -> Reference | None:
     """Parse simple Terraform resource/data references.
 
     Supported:
@@ -435,6 +521,7 @@ def _parse_reference(expression: str) -> Reference | None:
       var.bucket_name
       local.bucket_prefix
       each.value
+      self.public_ip
 
     are expressions, not resource references, and therefore
     remain RawExpression.
@@ -456,7 +543,7 @@ def _parse_reference(expression: str) -> Reference | None:
 
     # Terraform variable, local, and meta-object references
     # are not resource references.
-    if parts[0] in {"var", "local", "each"}:
+    if parts[0] in {"var", "local", "each", "self"}:
         return None
 
     resource_type = parts[0]
@@ -476,7 +563,9 @@ def _parse_reference(expression: str) -> Reference | None:
     )
 
 
-def _strip_hcl_quotes(value: str) -> str:
+def _strip_hcl_quotes(
+    value: str,
+) -> str:
     value = value.strip()
 
     if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
@@ -485,7 +574,9 @@ def _strip_hcl_quotes(value: str) -> str:
     return value
 
 
-def _unwrap_literal(value: Any) -> Any:
+def _unwrap_literal(
+    value: Any,
+) -> Any:
     if isinstance(value, Literal):
         return value.value
 
@@ -519,7 +610,9 @@ def _unwrap_optional_bool(
     return bool(value)
 
 
-def _unwrap_string(value: Any) -> Any:
+def _unwrap_string(
+    value: Any,
+) -> Any:
     if not isinstance(value, str):
         return value
 
