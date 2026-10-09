@@ -6,12 +6,11 @@ from .expression import Expression
 @dataclass(frozen=True)
 class Reference(Expression):
     """
-    Reference to another Terraform object.
+    Reference to a Terraform resource.
 
     Examples:
-
-        aws_s3_bucket.data.id
-        aws_s3_bucket.data
+        aws_s3_bucket.example
+        aws_s3_bucket.example.id
     """
 
     resource_type: str
@@ -25,3 +24,55 @@ class Reference(Expression):
             value += f".{self.attribute}"
 
         return value
+
+
+@dataclass(frozen=True)
+class DataSourceReference(Expression):
+    """
+    Reference to a Terraform data source.
+
+    Example:
+        data.aws_ami.example.id
+    """
+
+    data_source_type: str
+    data_source_name: str
+    attribute: str | None = None
+
+    def to_string(self) -> str:
+        value = f"data.{self.data_source_type}.{self.data_source_name}"
+
+        if self.attribute:
+            value += f".{self.attribute}"
+
+        return value
+
+
+@dataclass(frozen=True)
+class VariableReference(Expression):
+    """
+    Reference to a Terraform input variable.
+
+    Example:
+        var.bucket_name
+    """
+
+    name: str
+
+    def to_string(self) -> str:
+        return f"var.{self.name}"
+
+
+@dataclass(frozen=True)
+class LocalReference(Expression):
+    """
+    Reference to a Terraform local value.
+
+    Example:
+        local.bucket_prefix
+    """
+
+    name: str
+
+    def to_string(self) -> str:
+        return f"local.{self.name}"

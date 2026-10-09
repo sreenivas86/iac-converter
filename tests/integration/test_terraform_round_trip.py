@@ -1,6 +1,12 @@
 from iac_converter.compiler.terraform_to_ir import parse_terraform
 from iac_converter.generator.terraform import generate_terraform
-from iac_converter.ir import RawExpression, Reference
+from iac_converter.ir import (
+    DataSourceReference,
+    LocalReference,
+    RawExpression,
+    Reference,
+    VariableReference,
+)
 from iac_converter.parser.yaml_parser import parse_yaml
 
 
@@ -188,8 +194,140 @@ output "bucket_name" {
 
     assert variable.name == "bucket_name"
 
+    assert isinstance(resource.attributes["bucket"], VariableReference)
+    assert resource.attributes["bucket"].name == "bucket_name"
+
+    assert isinstance(output.value, VariableReference)
+    assert output.value.name == "bucket_name"
+
+
+def test_terraform_round_trip_preserves_data_source_reference() -> None:
+    terraform_source = """
+data "aws_ami" "example" {
+  most_recent = true
+
+  owners = ["amazon"]
+}
+
+output "ami_id" {
+  value = data.aws_ami.example.id
+}
+"""
+
+    first_ir = parse_terraform(terraform_source)
+
+    generated_terraform = generate_terraform(first_ir)
+
+    second_ir = parse_terraform(generated_terraform)
+
+    assert len(second_ir.data_sources) == 1
+    assert len(second_ir.outputs) == 1
+
+    output = second_ir.outputs[0]
+
+    assert isinstance(output.value, DataSourceReference)
+    assert output.value.data_source_type == "aws_ami"
+    assert output.value.data_source_name == "example"
+    assert output.value.attribute == "id"
+
+
+def test_terraform_round_trip_preserves_local_reference() -> None:
+    terraform_source = """
+locals {
+  bucket_prefix = "demo"
+}
+
+output "prefix" {
+  value = local.bucket_prefix
+}
+"""
+
+    first_ir = parse_terraform(terraform_source)
+
+    generated_terraform = generate_terraform(first_ir)
+
+    second_ir = parse_terraform(generated_terraform)
+
+    assert len(second_ir.outputs) == 1
+
+    output = second_ir.outputs[0]
+
+    assert isinstance(output.value, LocalReference)
+    assert output.value.name == "bucket_prefix"
+
+
+def test_terraform_round_trip_preserves_each_reference() -> None:
+    terraform_source = """
+variable "bucket_names" {
+  type    = list(string)
+  default = ["bucket-a", "bucket-b"]
+}
+
+resource "aws_s3_bucket" "example" {
+  for_each = toset(var.bucket_names)
+
+  bucket = each.value
+}
+"""
+
+    first_ir = parse_terraform(terraform_source)
+
+    generated_terraform = generate_terraform(first_ir)
+
+    second_ir = parse_terraform(generated_terraform)
+
+    assert len(second_ir.resources) == 1
+
+    resource = second_ir.resources[0]
+
     assert isinstance(resource.attributes["bucket"], RawExpression)
-    assert resource.attributes["bucket"].value == "var.bucket_name"
+    assert resource.attributes["bucket"].value == "each.value"
+
+
+def test_terraform_round_trip_preserves_file_function_expression() -> None:
+    terraform_source = """
+resource "aws_instance" "example" {
+  user_data = file("userdata.sh")
+}
+"""
+
+    first_ir = parse_terraform(terraform_source)
+
+    generated_terraform = generate_terraform(first_ir)
+
+    second_ir = parse_terraform(generated_terraform)
+
+    assert len(second_ir.resources) == 1
+
+    resource = second_ir.resources[0]
+
+    assert isinstance(resource.attributes["user_data"], RawExpression)
+    assert resource.attributes["user_data"].value == 'file("userdata.sh")'
+
+
+def test_terraform_round_trip_preserves_conditional_expression() -> None:
+    terraform_source = """
+variable "create_bucket" {
+  type    = bool
+  default = true
+}
+
+output "bucket_name" {
+  value = var.create_bucket ? "demo-bucket" : "disabled"
+}
+"""
+
+    first_ir = parse_terraform(terraform_source)
+
+    generated_terraform = generate_terraform(first_ir)
+
+    second_ir = parse_terraform(generated_terraform)
+
+    assert len(second_ir.outputs) == 1
+
+    output = second_ir.outputs[0]
 
     assert isinstance(output.value, RawExpression)
-    assert output.value.value == "var.bucket_name"
+    assert output.value.value == (
+        'var.create_bucket ? "demo-bucket" : "disabled"'
+    )

@@ -6,7 +6,9 @@ from typing import Any
 from iac_converter.ir import (
     Block,
     DataSource,
+    DataSourceReference,
     Literal,
+    LocalReference,
     Output,
     ProjectIR,
     Provider,
@@ -14,6 +16,7 @@ from iac_converter.ir import (
     Reference,
     Resource,
     Variable,
+    VariableReference,
 )
 
 
@@ -524,7 +527,15 @@ class TerraformGenerator:
                 expression=expression,
             )
 
-        if isinstance(value, Reference):
+        if isinstance(
+            value,
+            (
+                Reference,
+                DataSourceReference,
+                VariableReference,
+                LocalReference,
+            ),
+        ):
             return value.to_string()
 
         if isinstance(value, RawExpression):

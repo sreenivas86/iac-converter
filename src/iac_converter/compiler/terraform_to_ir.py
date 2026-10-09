@@ -8,7 +8,9 @@ import hcl2
 from iac_converter.ir import (
     Block,
     DataSource,
+    DataSourceReference,
     Literal,
+    LocalReference,
     Output,
     ProjectIR,
     Provider,
@@ -16,6 +18,7 @@ from iac_converter.ir import (
     Reference,
     Resource,
     Variable,
+    VariableReference,
 )
 
 
@@ -508,58 +511,62 @@ def _extract_expression(
     return None
 
 
-def _parse_reference(
-    expression: str,
-) -> Reference | None:
-    """Parse simple Terraform resource/data references.
+def _parse_reference(expression: str) -> Any | None:
+    """Parse simple Terraform references into typed IR expressions.
 
-    Supported:
-
-        aws_s3_bucket.data
-        aws_s3_bucket.data.id
-
-    Variable, local, and Terraform meta-object references such as:
-
-        var.bucket_name
-        local.bucket_prefix
-        each.value
-        self.public_ip
-
-    remain RawExpression.
-
-    Complex expressions remain RawExpression.
+    Supported references include resources, data sources, input variables,
+    and local values. Meta-object references (such as ``each.value`` and
+    ``self.public_ip``) and complex expressions remain RawExpression values.
     """
     expression = expression.strip()
 
+    # Expressions containing operators, function calls, indexes, or other
+    # syntax are outside the scope of simple-reference parsing.
     if any(
         char in expression
-        for char in ("?", ":", "(", ")", "[", "]", ",")
+        for char in ("?", ":", "(", ")", "[", "]", ",", " ", '"')
     ):
         return None
 
     parts = expression.split(".")
+    if any(not part for part in parts):
+        return None
 
+    # Input variable: var.bucket_name
+    if len(parts) == 2 and parts[0] == "var":
+        return VariableReference(name=parts[1])
+
+    # Local value: local.bucket_prefix
+    if len(parts) == 2 and parts[0] == "local":
+        return LocalReference(name=parts[1])
+
+    # Terraform meta-object references are kept as raw expressions for now.
+    if parts[0] in {"each", "self"}:
+        return None
+
+    # Data source: data.aws_ami.example or data.aws_ami.example.id
+    if parts[0] == "data":
+        if len(parts) == 3:
+            return DataSourceReference(
+                data_source_type=parts[1],
+                data_source_name=parts[2],
+            )
+        if len(parts) == 4:
+            return DataSourceReference(
+                data_source_type=parts[1],
+                data_source_name=parts[2],
+                attribute=parts[3],
+            )
+        return None
+
+    # Resource: aws_s3_bucket.example or aws_s3_bucket.example.id
     if len(parts) not in (2, 3):
         return None
 
-    # These are Terraform expressions, not resource references.
-    if parts[0] in {"var", "local", "each", "self"}:
-        return None
-
-    resource_type = parts[0]
-    resource_name = parts[1]
-    attribute = parts[2] if len(parts) == 3 else None
-
-    if not resource_type or not resource_name:
-        return None
-
-    if attribute is not None and not attribute:
-        return None
-
     return Reference(
-        resource_type=resource_type,
-        resource_name=resource_name,
-        attribute=attribute,
+        resource_type=parts[0],
+        resource_name=parts[1],
+        attribute=parts[2] if len(parts) == 3 else None,
     )
 
 

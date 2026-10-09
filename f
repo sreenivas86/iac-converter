@@ -205,3 +205,19 @@ locals
 expressions
 references
 But it doesn't yet have a first-class representation for arbitrary nested blocks.
+------------------
+M1.4 — Expression and reference semantics
+
+Test and preserve:
+
+aws_s3_bucket.example
+aws_s3_bucket.example.id
+data.aws_ami.example.id
+var.bucket_name
+local.bucket_prefix
+each.value
+self.public_ip
+file("...")
+${var.foo} interpolation
+complex expressions such as conditional expressions and indexing
+----------------------
