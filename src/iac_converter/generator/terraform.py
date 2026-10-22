@@ -6,7 +6,10 @@ from typing import Any
 from iac_converter.ir import (
     Block,
     DataSource,
+    ConditionalExpression,
+    CollectionExpression,
     DataSourceReference,
+    FunctionCall,
     Literal,
     LocalReference,
     Output,
@@ -540,6 +543,42 @@ class TerraformGenerator:
 
         if isinstance(value, RawExpression):
             return value.value
+
+        if isinstance(value, FunctionCall):
+            # Function arguments can be literals (which need quoting), typed
+            # references, or nested expressions. Let each argument's type
+            # determine its rendering rather than forcing expression mode.
+            arguments = ", ".join(
+                self._render_value(argument)
+                for argument in value.arguments
+            )
+            return f"{value.name}({arguments})"
+
+        if isinstance(value, ConditionalExpression):
+            condition = self._render_value(value.condition, expression=True)
+            # Conditional branches may be string literals, so render them
+            # normally to preserve their quotes in generated HCL.
+            true_value = self._render_value(value.true_value)
+            false_value = self._render_value(value.false_value)
+            return f"{condition} ? {true_value} : {false_value}"
+
+        if isinstance(value, CollectionExpression):
+            if value.kind in {"list", "tuple"}:
+                return self._render_list(
+                    list(value.items),
+                    expression=expression,
+                )
+            if value.kind == "map":
+                try:
+                    mapping = dict(value.items)
+                except (TypeError, ValueError) as exc:
+                    raise TerraformGenerationError(
+                        "Map CollectionExpression items must be key/value pairs"
+                    ) from exc
+                return self._render_object(mapping)
+            raise TerraformGenerationError(
+                f"Unsupported collection kind: {value.kind}"
+            )
 
         if isinstance(value, dict):
             return self._render_object(value)

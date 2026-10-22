@@ -4,7 +4,7 @@ from iac_converter.compiler import (
     parse_yaml_project,
 )
 from iac_converter.generator import generate_terraform
-from iac_converter.ir import Literal
+from iac_converter.ir import Literal,CollectionExpression
 from iac_converter.project import Project, ProjectFile
 
 
@@ -50,10 +50,14 @@ resources:
         == Literal(True)
     )
 
-    assert original_resource.lifecycle["ignore_changes"] == [
-        Literal("tags"),
-        Literal("bucket"),
-    ]
+    ignore_changes = original_resource.lifecycle["ignore_changes"]
+
+    assert isinstance(ignore_changes, CollectionExpression)
+    assert ignore_changes.kind == "list"
+    assert ignore_changes.items == (
+    Literal("tags"),
+    Literal("bucket"),
+)
 
     # ---------------------------------------------------------
     # ProjectIR -> Terraform

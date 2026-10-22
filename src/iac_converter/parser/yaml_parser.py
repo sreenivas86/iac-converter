@@ -1,10 +1,10 @@
-
 from typing import Any
 
 import yaml
 
 from iac_converter.ir import (
     Block,
+    CollectionExpression,
     DataSource,
     Literal,
     Output,
@@ -15,7 +15,6 @@ from iac_converter.ir import (
     Resource,
     Variable,
 )
-
 from iac_converter.schema.yaml_schema import YAMLProject
 
 
@@ -33,9 +32,7 @@ def load_yaml(source: str) -> dict[str, Any]:
         return {}
 
     if not isinstance(data, dict):
-        raise YAMLParseError(
-            "YAML project root must be an object"
-        )
+        raise YAMLParseError("YAML project root must be an object")
 
     return data
 
@@ -94,12 +91,12 @@ def _parse_resources(project: YAMLProject) -> list[Resource]:
         Resource(
             type=resource.type,
             name=resource.name,
-            attributes=_convert_value(resource.properties),
+            attributes=_convert_mapping(resource.properties),
             blocks=_parse_blocks(resource.blocks),
             count=_convert_value(resource.count),
             for_each=_convert_value(resource.for_each),
             depends_on=_convert_value(resource.depends_on),
-            lifecycle=_convert_value(resource.lifecycle),
+            lifecycle=_convert_mapping(resource.lifecycle),
             provisioners=_parse_provisioners(resource.provisioners),
         )
         for resource in project.resources
@@ -114,7 +111,7 @@ def _parse_blocks(blocks: list[Any]) -> list[Block]:
             Block(
                 type=block.type,
                 labels=list(block.labels),
-                attributes=_convert_value(block.properties),
+                attributes=_convert_mapping(block.properties),
                 blocks=_parse_blocks(block.blocks),
             )
         )
@@ -131,9 +128,7 @@ def _parse_provisioners(
         provisioner_type = provisioner.get("type")
 
         if not isinstance(provisioner_type, str):
-            raise YAMLParseError(
-                "Provisioner 'type' must be a string"
-            )
+            raise YAMLParseError("Provisioner 'type' must be a string")
 
         properties = provisioner.get("properties", {})
 
@@ -144,7 +139,7 @@ def _parse_provisioners(
 
         converted_provisioner: dict[str, Any] = {
             "type": provisioner_type,
-            "properties": _convert_value(properties),
+            "properties": _convert_mapping(properties),
         }
 
         connection = provisioner.get("connection")
@@ -155,7 +150,7 @@ def _parse_provisioners(
                     "Provisioner 'connection' must be an object"
                 )
 
-            converted_provisioner["connection"] = _convert_value(
+            converted_provisioner["connection"] = _convert_mapping(
                 connection
             )
 
@@ -169,7 +164,7 @@ def _parse_data_sources(project: YAMLProject) -> list[DataSource]:
         DataSource(
             type=data_source.type,
             name=data_source.name,
-            attributes=_convert_value(data_source.properties),
+            attributes=_convert_mapping(data_source.properties),
         )
         for data_source in project.data_sources
     ]
@@ -187,7 +182,16 @@ def _parse_outputs(project: YAMLProject) -> list[Output]:
     ]
 
 
+def _convert_mapping(value: dict[str, Any]) -> dict[str, Any]:
+    """Preserve structural mappings while converting their values."""
+    return {
+        key: _convert_value(item)
+        for key, item in value.items()
+    }
+
+
 def _convert_value(value: Any) -> Any:
+    """Convert YAML values into typed IR expressions."""
     if value is None:
         return None
 
@@ -196,9 +200,7 @@ def _convert_value(value: Any) -> Any:
             expression = value["expression"]
 
             if not isinstance(expression, str):
-                raise YAMLParseError(
-                    "'expression' must be a string"
-                )
+                raise YAMLParseError("'expression' must be a string")
 
             return RawExpression(expression)
 
@@ -206,9 +208,7 @@ def _convert_value(value: Any) -> Any:
             reference = value["reference"]
 
             if not isinstance(reference, dict):
-                raise YAMLParseError(
-                    "'reference' must be an object"
-                )
+                raise YAMLParseError("'reference' must be an object")
 
             return Reference(
                 resource_type=reference["resource_type"],
@@ -216,16 +216,18 @@ def _convert_value(value: Any) -> Any:
                 attribute=reference.get("attribute"),
             )
 
-        return {
-            key: _convert_value(item)
-            for key, item in value.items()
-        }
+        return CollectionExpression(
+            kind="map",
+            items=tuple(
+                (key, _convert_value(item))
+                for key, item in value.items()
+            ),
+        )
 
     if isinstance(value, list):
-        return [
-            _convert_value(item)
-            for item in value
-        ]
+        return CollectionExpression(
+            kind="list",
+            items=tuple(_convert_value(item) for item in value),
+        )
 
     return Literal(value)
-

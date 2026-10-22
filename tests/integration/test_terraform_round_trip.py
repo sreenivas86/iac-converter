@@ -1,7 +1,9 @@
 from iac_converter.compiler.terraform_to_ir import parse_terraform
 from iac_converter.generator.terraform import generate_terraform
 from iac_converter.ir import (
+    ConditionalExpression,
     DataSourceReference,
+    FunctionCall,
     LocalReference,
     RawExpression,
     Reference,
@@ -301,8 +303,11 @@ resource "aws_instance" "example" {
 
     resource = second_ir.resources[0]
 
-    assert isinstance(resource.attributes["user_data"], RawExpression)
-    assert resource.attributes["user_data"].value == 'file("userdata.sh")'
+    expression = resource.attributes["user_data"]
+    assert isinstance(expression, FunctionCall)
+    assert expression.name == "file"
+    assert len(expression.arguments) == 1
+    assert expression.arguments[0].value == "userdata.sh"
 
 
 def test_terraform_round_trip_preserves_conditional_expression() -> None:
@@ -327,7 +332,9 @@ output "bucket_name" {
 
     output = second_ir.outputs[0]
 
-    assert isinstance(output.value, RawExpression)
-    assert output.value.value == (
-        'var.create_bucket ? "demo-bucket" : "disabled"'
-    )
+    expression = output.value
+    assert isinstance(expression, ConditionalExpression)
+    assert isinstance(expression.condition, VariableReference)
+    assert expression.condition.name == "create_bucket"
+    assert expression.true_value.value == "demo-bucket"
+    assert expression.false_value.value == "disabled"

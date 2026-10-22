@@ -8,7 +8,10 @@ import hcl2
 from iac_converter.ir import (
     Block,
     DataSource,
+    CollectionExpression,
+    ConditionalExpression,
     DataSourceReference,
+    FunctionCall,
     Literal,
     LocalReference,
     Output,
@@ -58,8 +61,9 @@ def _parse_terraform_block(
     if not blocks:
         return {}
 
-    # Terraform normally has one terraform block.
-    return _convert_value(blocks[0])
+    # Keep the terraform block itself as a mapping, while converting its
+    # individual attribute values into IR values.
+    return _convert_mapping(blocks[0])
 
 
 def _parse_providers(
@@ -146,7 +150,7 @@ def _parse_validation(
         return []
 
     return [
-        _convert_value(item)
+        _convert_mapping(item) if isinstance(item, dict) else {"value": _convert_value(item)}
         for item in value
     ]
 
@@ -447,25 +451,42 @@ def _convert_block(
     return {}
 
 
+def _convert_mapping(value: dict[str, Any]) -> dict[str, Any]:
+    """Convert a structural HCL mapping while keeping its outer shape."""
+    return {
+        key: _convert_value(item)
+        for key, item in value.items()
+        if key != "__is_block__"
+    }
+
+
 def _convert_value(
     value: Any,
 ) -> Any:
-    """Convert python-hcl2 values into IR values."""
+    """Convert python-hcl2 values into IR values.
+
+    Lists and object/map values become CollectionExpression nodes. Structural
+    mappings such as top-level block bodies are handled by _convert_mapping
+    so the project model and generator can continue treating them as mappings.
+    """
     if value is None:
         return None
 
     if isinstance(value, dict):
-        return {
-            key: _convert_value(item)
-            for key, item in value.items()
-            if key != "__is_block__"
-        }
+        return CollectionExpression(
+            kind="map",
+            items=tuple(
+                (key, _convert_value(item))
+                for key, item in value.items()
+                if key != "__is_block__"
+            ),
+        )
 
     if isinstance(value, list):
-        return [
-            _convert_value(item)
-            for item in value
-        ]
+        return CollectionExpression(
+            kind="list",
+            items=tuple(_convert_value(item) for item in value),
+        )
 
     if isinstance(value, str):
         return _convert_string(value)
@@ -490,10 +511,10 @@ def _convert_string(
         expression = _extract_expression(value)
 
         if expression is not None:
-            reference = _parse_reference(expression)
+            structured = _parse_structured_expression(expression)
 
-            if reference is not None:
-                return reference
+            if structured is not None:
+                return structured
 
             return RawExpression(expression)
 
@@ -510,6 +531,160 @@ def _extract_expression(
 
     return None
 
+
+
+def _parse_structured_expression(expression: str) -> Any | None:
+    """Parse common Terraform expressions into typed IR nodes.
+
+    Supports simple references, function calls, and top-level conditional
+    expressions. Anything more complex remains a RawExpression fallback.
+    """
+    expression = expression.strip()
+
+    reference = _parse_reference(expression)
+    if reference is not None:
+        return reference
+
+    conditional_parts = _split_conditional(expression)
+    if conditional_parts is not None:
+        condition_text, true_text, false_text = conditional_parts
+        condition = _parse_expression_atom(condition_text)
+        true_value = _parse_expression_atom(true_text)
+        false_value = _parse_expression_atom(false_text)
+        if condition is not None and true_value is not None and false_value is not None:
+            return ConditionalExpression(
+                condition=condition,
+                true_value=true_value,
+                false_value=false_value,
+            )
+        return None
+
+    function = _parse_function_call(expression)
+    if function is not None:
+        return function
+
+    return None
+
+
+def _parse_expression_atom(expression: str) -> Any | None:
+    expression = expression.strip()
+    reference = _parse_reference(expression)
+    if reference is not None:
+        return reference
+
+    function = _parse_function_call(expression)
+    if function is not None:
+        return function
+
+    if expression in {"true", "false"}:
+        return Literal(expression == "true")
+    if expression == "null":
+        return Literal(None)
+    if len(expression) >= 2 and expression[0] == '"' and expression[-1] == '"':
+        return Literal(expression[1:-1])
+    try:
+        if "." in expression:
+            return Literal(float(expression))
+        return Literal(int(expression))
+    except ValueError:
+        return None
+
+
+def _parse_function_call(expression: str) -> FunctionCall | None:
+    opening = expression.find("(")
+    if opening <= 0 or not expression.endswith(")"):
+        return None
+
+    name = expression[:opening].strip()
+    if not name.replace("_", "a").isalnum() or not name[0].isalpha():
+        return None
+
+    inner = expression[opening + 1:-1].strip()
+    if not inner:
+        return FunctionCall(name=name, arguments=())
+
+    argument_texts = _split_top_level(inner, ",")
+    arguments: list[Any] = []
+    for argument_text in argument_texts:
+        argument = _parse_expression_atom(argument_text)
+        if argument is None:
+            return None
+        arguments.append(argument)
+
+    return FunctionCall(name=name, arguments=tuple(arguments))
+
+
+def _split_conditional(expression: str) -> tuple[str, str, str] | None:
+    question_index = _find_top_level_character(expression, "?")
+    if question_index < 0:
+        return None
+
+    colon_index = _find_top_level_character(expression, ":", start=question_index + 1)
+    if colon_index < 0:
+        return None
+
+    condition = expression[:question_index].strip()
+    true_value = expression[question_index + 1:colon_index].strip()
+    false_value = expression[colon_index + 1:].strip()
+    if not condition or not true_value or not false_value:
+        return None
+    return condition, true_value, false_value
+
+
+def _split_top_level(value: str, delimiter: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    in_string = False
+    escaped = False
+
+    for index, character in enumerate(value):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+        if character == '"':
+            in_string = True
+        elif character in "([{}":
+            depth += 1
+        elif character in ")]}" :
+            depth -= 1
+        elif character == delimiter and depth == 0:
+            parts.append(value[start:index].strip())
+            start = index + 1
+
+    parts.append(value[start:].strip())
+    return parts
+
+
+def _find_top_level_character(value: str, target: str, start: int = 0) -> int:
+    depth = 0
+    in_string = False
+    escaped = False
+
+    for index in range(start, len(value)):
+        character = value[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+        if character == '"':
+            in_string = True
+        elif character in "([{":
+            depth += 1
+        elif character in ")]}" :
+            depth -= 1
+        elif character == target and depth == 0:
+            return index
+    return -1
 
 def _parse_reference(expression: str) -> Any | None:
     """Parse simple Terraform references into typed IR expressions.

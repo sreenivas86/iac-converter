@@ -5,6 +5,7 @@ from typing import Any
 import yaml
 
 from iac_converter.ir import (
+    CollectionExpression,
     DataSource,
     Literal,
     Output,
@@ -69,9 +70,7 @@ class YAMLGenerator:
                 for output in project.outputs
             ]
 
-        # Remove any parser-specific metadata that may have survived into
-        # the IR. This is intentionally done immediately before serialization
-        # so generated YAML never exposes internal implementation details.
+        # Remove parser-specific metadata immediately before serialization.
         document = self._clean_internal_markers(document)
 
         result = yaml.safe_dump(
@@ -81,8 +80,7 @@ class YAMLGenerator:
             allow_unicode=True,
         )
 
-        # PyYAML normally chooses single quotes for the string "1".
-        # Our YAML contract uses a canonical quoted project version.
+        # Keep the project version in its canonical quoted form.
         if result.startswith("version: '1'"):
             result = result.replace(
                 "version: '1'",
@@ -129,9 +127,7 @@ class YAMLGenerator:
         }
 
         if variable.type is not None:
-            result["type"] = self._convert_value(
-                variable.type
-            )
+            result["type"] = self._convert_value(variable.type)
 
         if variable.description is not None:
             result["description"] = variable.description
@@ -171,9 +167,7 @@ class YAMLGenerator:
         }
 
         if resource.count is not None:
-            result["count"] = self._convert_value(
-                resource.count
-            )
+            result["count"] = self._convert_value(resource.count)
 
         if resource.for_each is not None:
             result["for_each"] = self._convert_value(
@@ -223,9 +217,7 @@ class YAMLGenerator:
     ) -> dict[str, Any]:
         result: dict[str, Any] = {
             "name": output.name,
-            "value": self._convert_value(
-                output.value
-            ),
+            "value": self._convert_value(output.value),
         }
 
         if output.description is not None:
@@ -266,6 +258,24 @@ class YAMLGenerator:
             return {
                 "expression": value.value,
             }
+
+        if isinstance(value, CollectionExpression):
+            if value.kind == "map":
+                return {
+                    key: self._convert_value(item)
+                    for key, item in value.items
+                    if key != "__is_block__"
+                }
+
+            if value.kind in {"list", "tuple"}:
+                return [
+                    self._convert_value(item)
+                    for item in value.items
+                ]
+
+            raise YAMLGenerationError(
+                f"Unsupported collection kind: {value.kind}"
+            )
 
         if isinstance(value, dict):
             return {
