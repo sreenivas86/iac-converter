@@ -221,3 +221,69 @@ file("...")
 ${var.foo} interpolation
 complex expressions such as conditional expressions and indexing
 ----------------------
+
+
+
+
+
+
+
+
+----------- tasks ---------------27-10-26
+1
+
+Expression round-tripping
+Next step
+Test nested collections containing references, function calls, and conditional expressions in both conversion directions. Verify that expressions don't accidentally become quoted strings or lose their structure.
+
+
+
+2
+
+Tuple and collection semantics
+
+Terraform uses square-bracket syntax for tuple/list constructors, and YAML has no native tuple type. Decide how to preserve or represent tuple-versus-list distinctions, potentially using type information or an explicit serialization convention.
+
+
+
+3
+
+Full IR coverage
+
+Audit how resources, data sources, providers, variables, outputs, locals, lifecycle rules, provisioners, dependencies, and metadata are represented and preserved across both formats.
+
+
+
+4
+
+Provider and resource coverage
+
+S3 is our initial AWS provider/resource focus. Expand and verify support for additional AWS resources, data sources, and provider-specific attributes as required by the project.
+
+
+
+5
+
+Validation and error handling
+
+Improve handling of malformed YAML, unsupported Terraform expressions, invalid collection structures, and conversion errors with useful messages.
+
+
+
+
+6
+
+End-to-end verification
+
+Test complete YAML → IR → Terraform and Terraform → IR → YAML conversions on realistic infrastructure examples, including comparisons of semantic equivalence and, where possible, Terraform validation.
+
+
+
+7
+
+Production readiness
+
+Review the CLI/API, documentation, supported-feature matrix, fixtures, packaging, and continuous integration.
+
+
+------------------------- 

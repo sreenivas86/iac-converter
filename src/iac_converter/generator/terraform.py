@@ -556,10 +556,16 @@ class TerraformGenerator:
 
         if isinstance(value, ConditionalExpression):
             condition = self._render_value(value.condition, expression=True)
-            # Conditional branches may be string literals, so render them
-            # normally to preserve their quotes in generated HCL.
+
             true_value = self._render_value(value.true_value)
             false_value = self._render_value(value.false_value)
+
+            if isinstance(value.true_value, ConditionalExpression):
+                true_value = f"({true_value})"
+
+            if isinstance(value.false_value, ConditionalExpression):
+                false_value = f"({false_value})"
+
             return f"{condition} ? {true_value} : {false_value}"
 
         if isinstance(value, CollectionExpression):

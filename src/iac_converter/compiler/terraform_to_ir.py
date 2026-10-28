@@ -203,44 +203,7 @@ def _parse_resources(
     return resources
 
 
-def _parse_nested_blocks(
-    configuration: dict[str, Any],
-) -> list[Block]:
-    blocks: list[Block] = []
 
-    meta_arguments = {
-        "count",
-        "for_each",
-        "depends_on",
-        "lifecycle",
-        "provisioner",
-        "connection",
-        "__is_block__",
-    }
-
-    for key, value in configuration.items():
-        if key in meta_arguments:
-            continue
-
-        if not isinstance(value, list):
-            continue
-
-        for item in value:
-            if not isinstance(item, dict):
-                continue
-
-            if "__is_block__" not in item:
-                continue
-
-            blocks.append(
-                Block(
-                    type=_strip_hcl_quotes(key),
-                    attributes=_parse_block_attributes(item),
-                    blocks=_parse_nested_blocks(item),
-                )
-            )
-
-    return blocks
 
 
 def _parse_block_attributes(
@@ -531,15 +494,87 @@ def _extract_expression(
 
     return None
 
+def _strip_outer_parentheses(expression: str) -> str:
+    """Remove parentheses only when they enclose the entire expression."""
+    expression = expression.strip()
 
+    while expression.startswith("(") and expression.endswith(")"):
+        depth = 0
+        in_string = False
+        escaped = False
+        encloses_all = True
+
+        for index, character in enumerate(expression):
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif character == "\\":
+                    escaped = True
+                elif character == '"':
+                    in_string = False
+                continue
+
+            if character == '"':
+                in_string = True
+            elif character == "(":
+                depth += 1
+            elif character == ")":
+                depth -= 1
+                if depth == 0 and index != len(expression) - 1:
+                    encloses_all = False
+                    break
+
+        if not encloses_all or depth != 0:
+            break
+
+        expression = expression[1:-1].strip()
+
+    return expression
+def _parse_map_expression(expression: str) -> CollectionExpression | None:
+    """Parse a simple Terraform object/map literal into structured IR."""
+    expression = expression.strip()
+
+    if not (
+        expression.startswith("{")
+        and expression.endswith("}")
+    ):
+        return None
+
+    inner = expression[1:-1].strip()
+    if not inner:
+        return CollectionExpression(kind="map", items=())
+
+    items: list[tuple[str, Any]] = []
+
+    for entry in _split_top_level(inner, ","):
+        separator = _find_top_level_character(entry, "=")
+        if separator < 0:
+            return None
+
+        key_text = entry[:separator].strip()
+        value_text = entry[separator + 1:].strip()
+
+        if not key_text or not value_text:
+            return None
+
+        key = _strip_hcl_quotes(key_text)
+        value = _parse_structured_expression(value_text)
+
+        if value is None:
+            return None
+
+        items.append((key, value))
+
+    return CollectionExpression(
+        kind="map",
+        items=tuple(items),
+    )
 
 def _parse_structured_expression(expression: str) -> Any | None:
-    """Parse common Terraform expressions into typed IR nodes.
-
-    Supports simple references, function calls, and top-level conditional
-    expressions. Anything more complex remains a RawExpression fallback.
-    """
-    expression = expression.strip()
+    """Parse common Terraform expressions into typed IR nodes."""
+    expression = _strip_outer_parentheses(expression.strip())
+    if expression.startswith("{") and expression.endswith("}"):
+        return _parse_map_expression(expression)
 
     reference = _parse_reference(expression)
     if reference is not None:
@@ -548,10 +583,15 @@ def _parse_structured_expression(expression: str) -> Any | None:
     conditional_parts = _split_conditional(expression)
     if conditional_parts is not None:
         condition_text, true_text, false_text = conditional_parts
-        condition = _parse_expression_atom(condition_text)
-        true_value = _parse_expression_atom(true_text)
-        false_value = _parse_expression_atom(false_text)
-        if condition is not None and true_value is not None and false_value is not None:
+        condition = _parse_structured_expression(condition_text)
+        true_value = _parse_structured_expression(true_text)
+        false_value = _parse_structured_expression(false_text)
+
+        if (
+            condition is not None
+            and true_value is not None
+            and false_value is not None
+        ):
             return ConditionalExpression(
                 condition=condition,
                 true_value=true_value,
@@ -563,8 +603,7 @@ def _parse_structured_expression(expression: str) -> Any | None:
     if function is not None:
         return function
 
-    return None
-
+    return _parse_expression_atom(expression)
 
 def _parse_expression_atom(expression: str) -> Any | None:
     expression = expression.strip()
@@ -606,11 +645,10 @@ def _parse_function_call(expression: str) -> FunctionCall | None:
     argument_texts = _split_top_level(inner, ",")
     arguments: list[Any] = []
     for argument_text in argument_texts:
-        argument = _parse_expression_atom(argument_text)
+        argument = _parse_structured_expression(argument_text)
         if argument is None:
             return None
         arguments.append(argument)
-
     return FunctionCall(name=name, arguments=tuple(arguments))
 
 
@@ -649,7 +687,7 @@ def _split_top_level(value: str, delimiter: str) -> list[str]:
             continue
         if character == '"':
             in_string = True
-        elif character in "([{}":
+        elif character in "([{":
             depth += 1
         elif character in ")]}" :
             depth -= 1
@@ -805,3 +843,63 @@ def _unwrap_string(
         return value[1:-1]
 
     return value
+
+
+
+def _parse_nested_blocks(
+    configuration: dict[str, Any],
+) -> list[Block]:
+    blocks: list[Block] = []
+
+    meta_arguments = {
+        "count",
+        "for_each",
+        "depends_on",
+        "lifecycle",
+        "provisioner",
+        "connection",
+        "__is_block__",
+    }
+
+    for key, value in configuration.items():
+        if key in meta_arguments or not isinstance(value, list):
+            continue
+
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+
+            labels: list[str] = []
+            block_configuration = item
+
+            # Unwrap label dictionaries until we reach the block payload.
+            while "__is_block__" not in block_configuration:
+                if len(block_configuration) != 1:
+                    break
+
+                label, nested = next(iter(block_configuration.items()))
+
+                if not isinstance(nested, dict):
+                    break
+
+                labels.append(_strip_hcl_quotes(label))
+                block_configuration = nested
+
+            # Only treat entries marked by python-hcl2 as blocks.
+            if "__is_block__" not in block_configuration:
+                continue
+
+            blocks.append(
+                Block(
+                    type=_strip_hcl_quotes(key),
+                    labels=labels,
+                    attributes=_parse_block_attributes(
+                        block_configuration
+                    ),
+                    blocks=_parse_nested_blocks(
+                        block_configuration
+                    ),
+                )
+            )
+
+    return blocks

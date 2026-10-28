@@ -1,5 +1,16 @@
+
+from iac_converter.ir import (
+    CollectionExpression,
+    FunctionCall,
+    Literal,
+    RawExpression,
+    Reference,
+)
+
+from iac_converter.generator.terraform import generate_terraform
 from iac_converter.generator.yaml import generate_yaml
 from iac_converter.parser.terraform_parser import parse_terraform
+from iac_converter.parser.yaml_parser import parse_yaml
 
 
 def test_terraform_to_yaml():
@@ -71,10 +82,7 @@ resource "aws_s3_bucket" "data" {
     assert "var.create_bucket ? 1 : 0" in result
 
 
-from iac_converter.generator.terraform import generate_terraform
-from iac_converter.generator.yaml import generate_yaml
-from iac_converter.parser.terraform_parser import parse_terraform
-from iac_converter.parser.yaml_parser import parse_yaml
+
 
 
 def test_full_round_trip():
@@ -132,3 +140,47 @@ resources:
 
     assert policy.type == "aws_s3_bucket_policy"
     assert policy.name == "policy"
+
+
+
+def test_nested_map_preserves_reference_and_function_call():
+    source = """
+resource "aws_s3_bucket" "data" {
+  bucket = "company-data"
+}
+
+output "settings" {
+  value = {
+    bucket_id       = aws_s3_bucket.data.id
+    normalized_name = lower("MY-BUCKET")
+  }
+}
+"""
+
+    project = parse_terraform(source)
+    result = generate_yaml(project)
+
+    # The reference should use the explicit YAML reference representation.
+    assert "reference:" in result
+    assert "resource_type: aws_s3_bucket" in result
+    assert "resource_name: data" in result
+    assert "attribute: id" in result
+
+    # The function call should use the explicit expression representation.
+    assert "expression:" in result
+    assert 'lower("MY-BUCKET")' in result
+    reparsed_project = parse_yaml(result)
+    reparsed_value = reparsed_project.outputs[0].value
+
+    assert isinstance(reparsed_value, CollectionExpression)
+    assert reparsed_value.kind == "map"
+
+    values = dict(reparsed_value.items)
+
+    reference = values["bucket_id"]
+    assert isinstance(reference, Reference)
+    assert reference.to_string() == "aws_s3_bucket.data.id"
+
+    function = values["normalized_name"]
+    assert isinstance(function, RawExpression)
+    assert function.value == 'lower("MY-BUCKET")'

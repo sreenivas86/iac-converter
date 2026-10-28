@@ -3,6 +3,7 @@ from iac_converter.compiler.terraform_project import (
     parse_terraform_project,
 )
 from iac_converter.project import Project, ProjectFile
+from iac_converter.ir import Literal
 
 
 def test_parse_terraform_project_merges_multiple_files():
@@ -144,3 +145,43 @@ resource "aws_s3_bucket" "logs" {
     assert len(result.resources) == 2
     assert result.resources[0].name == "data"
     assert result.resources[1].name == "logs"
+
+def test_parse_terraform_project_preserves_nested_output_expressions():
+    from iac_converter.ir import Reference, RawExpression
+
+    project = Project(
+        files=[
+            ProjectFile(
+                path="main.tf",
+                content="""
+resource "aws_s3_bucket" "data" {
+  bucket = "company-data"
+}
+
+output "settings" {
+  value = {
+    bucket_id = aws_s3_bucket.data.id
+    normalized_name = lower("MY-BUCKET")
+    nested = {
+      regions = ["ap-south-1", "ap-southeast-1"]
+    }
+  }
+}
+""",
+            ),
+        ]
+    )
+
+    result = parse_terraform_project(project)
+
+    settings = result.outputs[0].value
+
+    assert isinstance(settings, dict)
+    assert isinstance(settings["bucket_id"], Reference)
+    assert settings["bucket_id"].resource_name == "data"
+    assert isinstance(settings["normalized_name"], RawExpression)
+    assert settings["normalized_name"].value == 'lower("MY-BUCKET")'
+    assert settings["nested"]["regions"] == [
+        Literal("ap-south-1"),
+        Literal("ap-southeast-1"),
+    ]

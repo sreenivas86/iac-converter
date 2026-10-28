@@ -4,7 +4,9 @@ from iac_converter.compiler import (
     parse_yaml_project,
 )
 from iac_converter.generator import generate_terraform
+from iac_converter.generator.yaml import generate_yaml
 from iac_converter.project import Project, ProjectFile
+
 
 
 def test_yaml_to_terraform_to_ir_round_trip() -> None:
@@ -192,3 +194,119 @@ outputs:
 
     assert round_trip_output.name == original_output.name
     assert round_trip_output.value == original_output.value
+
+
+
+def test_nested_expressions_survive_yaml_terraform_round_trip() -> None:
+    
+    from iac_converter.ir import (
+    CollectionExpression,
+    Literal,
+    RawExpression,
+    Reference,
+)
+    
+
+    yaml_source = """
+resources:
+  - type: aws_s3_bucket
+    name: data
+    properties:
+      bucket: company-data
+
+outputs:
+  - name: settings
+    value:
+      bucket_id:
+        reference:
+          resource_type: aws_s3_bucket
+          resource_name: data
+          attribute: id
+      normalized_name:
+        expression: lower("MY-BUCKET")
+      nested:
+        regions:
+          - ap-south-1
+          - ap-southeast-1
+"""
+
+    original_ir = parse_yaml_project(yaml_source)
+    terraform_source = generate_terraform(original_ir)
+    
+
+    terraform_project = Project(
+        files=[
+            ProjectFile(
+                path="main.tf",
+                content=terraform_source,
+            )
+        ]
+    )
+
+    round_trip_ir = parse_terraform_project(terraform_project)
+
+    assert len(round_trip_ir.outputs) == 1
+    output = round_trip_ir.outputs[0]
+    assert output.name == "settings"
+
+    value = output.value
+    assert isinstance(value, dict)
+
+    values = value
+
+    # Resource reference remains typed.
+    reference = values["bucket_id"]
+    assert isinstance(reference, Reference)
+    assert reference.to_string() == "aws_s3_bucket.data.id"
+
+    # Function expression remains represented as raw Terraform syntax.
+    function = values["normalized_name"]
+    assert isinstance(function, RawExpression)
+    assert function.value == 'lower("MY-BUCKET")'
+
+    # Nested map and list retain their values.
+    nested = values["nested"]
+    assert isinstance(nested, dict)
+
+    regions = nested["regions"]
+    assert isinstance(regions, list)
+    assert regions == [
+        Literal("ap-south-1"),
+        Literal("ap-southeast-1"),
+    ]
+        # Terraform IR -> YAML -> IR
+    yaml_after_round_trip = generate_yaml(round_trip_ir)
+    yaml_reparsed_ir = parse_yaml_project(yaml_after_round_trip)
+
+    assert len(yaml_reparsed_ir.outputs) == 1
+
+    reparsed_value = yaml_reparsed_ir.outputs[0].value
+    assert isinstance(reparsed_value, CollectionExpression)
+    assert reparsed_value.kind == "map"
+
+    reparsed_items = dict(reparsed_value.items)
+
+    # Resource reference remains typed.
+    reparsed_reference = reparsed_items["bucket_id"]
+    assert isinstance(reparsed_reference, Reference)
+    assert reparsed_reference.to_string() == "aws_s3_bucket.data.id"
+
+    # Function expression remains represented in the IR.
+    reparsed_function = reparsed_items["normalized_name"]
+    assert isinstance(reparsed_function, RawExpression)
+    assert reparsed_function.value == 'lower("MY-BUCKET")'
+
+    # Nested map and list remain represented as collections.
+    reparsed_nested = reparsed_items["nested"]
+    assert isinstance(reparsed_nested, CollectionExpression)
+    assert reparsed_nested.kind == "map"
+
+    nested_items = dict(reparsed_nested.items)
+    reparsed_regions = nested_items["regions"]
+
+    assert isinstance(reparsed_regions, CollectionExpression)
+    assert reparsed_regions.kind == "list"
+    assert reparsed_regions.items == (
+        Literal("ap-south-1"),
+        Literal("ap-southeast-1"),
+    )

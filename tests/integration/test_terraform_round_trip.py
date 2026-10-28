@@ -10,6 +10,8 @@ from iac_converter.ir import (
     VariableReference,
 )
 from iac_converter.parser.yaml_parser import parse_yaml
+from iac_converter.generator.yaml import generate_yaml
+from iac_converter.compiler.terraform_to_ir import parse_terraform
 
 
 def test_yaml_terraform_round_trip_preserves_nested_block() -> None:
@@ -338,3 +340,75 @@ output "bucket_name" {
     assert expression.condition.name == "create_bucket"
     assert expression.true_value.value == "demo-bucket"
     assert expression.false_value.value == "disabled"
+
+
+
+def test_terraform_yaml_round_trip_preserves_nested_blocks() -> None:
+    terraform_source = """
+resource "example" "test" {
+  outer {
+    name = "foo"
+
+    inner {
+      enabled = true
+    }
+  }
+}
+"""
+
+    original_ir = parse_terraform(terraform_source)
+
+    yaml_source = generate_yaml(original_ir)
+
+    round_trip_ir = parse_yaml(yaml_source)
+
+    assert len(round_trip_ir.resources) == 1
+
+    resource = round_trip_ir.resources[0]
+    assert resource.type == "example"
+    assert resource.name == "test"
+
+    assert len(resource.blocks) == 1
+    outer = resource.blocks[0]
+
+    assert outer.type == "outer"
+    assert outer.attributes["name"].value == "foo"
+
+    assert len(outer.blocks) == 1
+    inner = outer.blocks[0]
+
+    assert inner.type == "inner"
+    assert inner.attributes["enabled"].value is True
+
+def test_terraform_yaml_round_trip_preserves_nested_block_labels() -> None:
+    terraform_source = """
+resource "example" "test" {
+  setting "primary" {
+    name = "foo"
+
+    child "secondary" {
+      enabled = true
+    }
+  }
+}
+"""
+
+    original_ir = parse_terraform(terraform_source)
+
+    assert len(original_ir.resources) == 1
+    resource = original_ir.resources[0]
+
+    assert len(resource.blocks) == 1
+    setting = resource.blocks[0]
+    assert setting.labels == ["primary"]
+
+    assert len(setting.blocks) == 1
+    child = setting.blocks[0]
+    assert child.labels == ["secondary"]
+
+    yaml_source = generate_yaml(original_ir)
+    round_trip_ir = parse_yaml(yaml_source)
+
+    round_trip_resource = round_trip_ir.resources[0]
+    assert round_trip_resource.blocks[0].labels == ["primary"]
+    assert round_trip_resource.blocks[0].blocks[0].labels == ["secondary"]

@@ -5,6 +5,7 @@ from typing import Any
 import yaml
 
 from iac_converter.ir import (
+    Block,
     CollectionExpression,
     DataSource,
     Literal,
@@ -165,6 +166,11 @@ class YAMLGenerator:
                 resource.attributes
             ),
         }
+        if resource.blocks:
+            result["blocks"] = [
+                self._generate_block(block)
+                for block in resource.blocks
+            ]
 
         if resource.count is not None:
             result["count"] = self._convert_value(resource.count)
@@ -188,6 +194,23 @@ class YAMLGenerator:
             result["provisioners"] = self._convert_value(
                 resource.provisioners
             )
+
+        return result
+
+    def _generate_block(self, block: Block) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "type": block.type,
+            "labels": list(block.labels),
+            "properties": self._convert_value(
+                block.attributes
+            ),
+        }
+
+        if block.blocks:
+            result["blocks"] = [
+                self._generate_block(child)
+                for child in block.blocks
+            ]
 
         return result
 
@@ -349,3 +372,5 @@ class YAMLGenerator:
 
 def generate_yaml(project: ProjectIR) -> str:
     return YAMLGenerator().generate(project)
+
+

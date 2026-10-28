@@ -91,4 +91,33 @@ resources:
     assert 'default = "company-data"' in terraform
     assert "bucket = var.bucket_name" in terraform
 
-   
+
+def test_yaml_nested_map_preserves_reference_and_function_call():
+    source = """
+resources:
+  - type: aws_s3_bucket
+    name: data
+    properties:
+      bucket: company-data
+
+outputs:
+  - name: settings
+    value:
+      bucket_id:
+        reference:
+          resource_type: aws_s3_bucket
+          resource_name: data
+          attribute: id
+      normalized_name:
+        expression: lower("MY-BUCKET")
+"""
+
+    project = parse_yaml(source)
+    terraform = generate_terraform(project)
+
+    assert "aws_s3_bucket.data.id" in terraform
+    assert 'lower("MY-BUCKET")' in terraform
+
+    # Expressions must not be rendered as quoted strings.
+    assert '"aws_s3_bucket.data.id"' not in terraform
+    assert '"lower(\\"MY-BUCKET\\")"' not in terraform

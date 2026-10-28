@@ -623,3 +623,68 @@ def _unwrap_string(
         return value[1:-1]
 
     return value
+
+
+def _parse_nested_blocks(
+    configuration: dict[str, Any],
+) -> list[Block]:
+    blocks: list[Block] = []
+
+    meta_arguments = {
+        "count",
+        "for_each",
+        "depends_on",
+        "lifecycle",
+        "provisioner",
+        "connection",
+        "__is_block__",
+    }
+
+    for key, value in configuration.items():
+        if key in meta_arguments:
+            continue
+
+        if not isinstance(value, list):
+            continue
+
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+
+            if "__is_block__" not in item:
+                continue
+
+            labels: list[str] = []
+            block_configuration: dict[str, Any] = {}
+
+            for item_key, item_value in item.items():
+                if item_key == "__is_block__":
+                    continue
+
+                # A labeled HCL block stores its labels as dictionary keys.
+                # A label maps to the configuration dictionary for that block.
+                if (
+                    isinstance(item_value, dict)
+                    and item_key not in meta_arguments
+                ):
+                    labels.append(_strip_hcl_quotes(item_key))
+                    block_configuration = item_value
+                    break
+
+            if not block_configuration:
+                block_configuration = item
+
+            blocks.append(
+                Block(
+                    type=_strip_hcl_quotes(key),
+                    labels=labels,
+                    attributes=_parse_block_attributes(
+                        block_configuration
+                    ),
+                    blocks=_parse_nested_blocks(
+                        block_configuration
+                    ),
+                )
+            )
+
+    return blocks
