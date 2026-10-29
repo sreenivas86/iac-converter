@@ -366,3 +366,153 @@ output "instance_ids" {
 
     assert isinstance(reparsed, RawExpression)
     assert reparsed.value == "var.instances[*].id"
+
+
+def test_list_comprehension_round_trip():
+    source = """
+variable "names" {
+  type    = list(string)
+  default = ["alpha", "beta"]
+}
+
+output "upper_names" {
+  value = [for name in var.names : upper(name)]
+}
+"""
+    from iac_converter.generator.terraform import generate_terraform
+    from iac_converter.ir import ForExpression, ForVariableReference
+
+    first_project = parse_terraform(source)
+    first_expression = first_project.outputs[0].value
+
+    assert isinstance(first_expression, ForExpression)
+    assert first_expression.variable == "name"
+    assert first_expression.collection == VariableReference(name="names")
+    assert first_expression.condition is None
+    assert first_expression.key is None
+    assert first_expression.value.arguments == (
+        ForVariableReference(name="name"),
+    )
+
+    generated = generate_terraform(first_project)
+    assert "[for name in var.names : upper(name)]" in generated
+
+    second_project = parse_terraform(generated)
+    second_expression = second_project.outputs[0].value
+
+    assert isinstance(second_expression, ForExpression)
+    assert second_expression == first_expression
+
+
+
+def test_filtered_list_comprehension_round_trip():
+    source = """
+variable "names" {
+  type    = list(string)
+  default = ["alpha", "skip", "beta"]
+}
+
+output "filtered_names" {
+  value = [for name in var.names : upper(name) if name != "skip"]
+}
+"""
+    from iac_converter.generator.terraform import generate_terraform
+    from iac_converter.ir import (
+        ForExpression,
+        ForVariableReference,
+        RawExpression,
+    )
+
+    project = parse_terraform(source)
+    expression = project.outputs[0].value
+
+    assert isinstance(expression, ForExpression)
+    assert expression.variable == "name"
+    assert expression.condition is not None
+    assert expression.condition == RawExpression(
+        value='name != "skip"'
+    )
+    assert expression.value.arguments == (
+        ForVariableReference(name="name"),
+    )
+
+    generated = generate_terraform(project)
+    assert (
+        '[for name in var.names : upper(name) if name != "skip"]'
+        in generated
+    )
+
+    reparsed = parse_terraform(generated)
+    reparsed_expression = reparsed.outputs[0].value
+
+    assert isinstance(reparsed_expression, ForExpression)
+    assert reparsed_expression.condition == expression.condition
+
+def test_map_comprehension_round_trip():
+    source = """
+variable "names" {
+  type    = list(string)
+  default = ["alpha", "beta"]
+}
+
+output "name_map" {
+  value = {
+    for name in var.names : name => upper(name)
+  }
+}
+"""
+    from iac_converter.generator.terraform import generate_terraform
+    from iac_converter.ir import ForExpression, ForVariableReference
+
+    project = parse_terraform(source)
+    expression = project.outputs[0].value
+
+    assert isinstance(expression, ForExpression)
+    assert expression.variable == "name"
+    assert expression.key == ForVariableReference(name="name")
+    assert expression.value.arguments == (
+        ForVariableReference(name="name"),
+    )
+
+    generated = generate_terraform(project)
+    assert "for name in var.names : name => upper(name)" in generated
+
+    reparsed = parse_terraform(generated)
+    assert reparsed.outputs[0].value == expression
+
+def test_grouped_filtered_map_comprehension_generation():
+    source = """
+variable "names" {
+  type    = list(string)
+  default = ["alpha", "apple", "beta", "skip"]
+}
+
+output "grouped_names" {
+  value = {
+    for name in var.names : substr(name, 0, 1) => name... if name != "skip"
+  }
+}
+"""
+    from iac_converter.generator.terraform import generate_terraform
+    from iac_converter.ir import ForExpression
+
+    project = parse_terraform(source)
+    expression = project.outputs[0].value
+
+    assert isinstance(expression, ForExpression)
+    assert expression.key is not None
+    assert expression.grouping is True
+    assert expression.condition is not None
+
+    generated = generate_terraform(project)
+
+    assert "name... if name !=" in generated
+    assert generated.index("name... if name !=") > generated.index("=>")
+    reparsed = parse_terraform(generated)
+    reparsed_expression = reparsed.outputs[0].value
+
+    assert isinstance(reparsed_expression, ForExpression)
+    assert reparsed_expression.grouping is True
+    assert reparsed_expression.condition == expression.condition
+    assert reparsed_expression.key == expression.key
+    assert reparsed_expression.value == expression.value

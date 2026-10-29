@@ -43,6 +43,17 @@ class ConditionalExpression(Expression):
     true_value: Expression
     false_value: Expression
 
+@dataclass(frozen=True)
+class ForExpression(Expression):
+    """A Terraform for-expression that produces a list or object."""
+
+    value: Expression
+    collection: Expression
+    key: Expression | None = None
+    variable: str = ""
+    key_variable: str | None = None
+    condition: Expression | None = None
+    grouping: bool = False
 
 @dataclass(frozen=True)
 class CollectionExpression(Expression):

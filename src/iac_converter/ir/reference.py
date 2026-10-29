@@ -76,3 +76,12 @@ class LocalReference(Expression):
 
     def to_string(self) -> str:
         return f"local.{self.name}"
+
+@dataclass(frozen=True)
+class ForVariableReference(Expression):
+    """Reference to a Terraform for-expression iteration variable."""
+
+    name: str
+
+    def to_string(self) -> str:
+        return self.name

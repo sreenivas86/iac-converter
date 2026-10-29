@@ -22,6 +22,8 @@ from iac_converter.ir import (
     Resource,
     Variable,
     VariableReference,
+    ForExpression,
+    ForVariableReference,
 )
 
 
@@ -570,11 +572,188 @@ def _parse_map_expression(expression: str) -> CollectionExpression | None:
         items=tuple(items),
     )
 
-def _parse_structured_expression(expression: str) -> Any | None:
+def _find_top_level_keyword(expression: str, keyword: str) -> int:
+    """Find a keyword outside strings and nested delimiters."""
+    depth = 0
+    in_string = False
+    escaped = False
+    index = 0
+
+    while index < len(expression):
+        character = expression[index]
+
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            index += 1
+            continue
+
+        if character == '"':
+            in_string = True
+        elif character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth -= 1
+        elif depth == 0 and expression.startswith(keyword, index):
+            before = expression[index - 1] if index > 0 else " "
+            after_index = index + len(keyword)
+            after = (
+                expression[after_index]
+                if after_index < len(expression)
+                else " "
+            )
+            if before.isspace() and after.isspace():
+                return index
+
+        index += 1
+
+    return -1
+
+
+
+def _parse_for_expression(expression: str) -> ForExpression | None:
+    """Parse Terraform list and object comprehensions into structured IR."""
+    expression = expression.strip()
+
+    is_list = expression.startswith("[for ") and expression.endswith("]")
+    is_map = expression.startswith("{for ") and expression.endswith("}")
+
+    if not is_list and not is_map:
+        return None
+
+    inner = expression[1:-1].strip()
+    colon_index = _find_top_level_character(inner, ":")
+    if colon_index < 0:
+        return None
+
+    iterator_clause = inner[4:colon_index].strip()
+    if " in " not in iterator_clause:
+        return None
+
+    variable, collection_text = iterator_clause.split(" in ", 1)
+    variable = variable.strip()
+    collection_text = collection_text.strip()
+    result_clause = inner[colon_index + 1:].strip()
+
+    if not variable or not collection_text or not result_clause:
+        return None
+
+    if not (
+        variable[0].isalpha() or variable[0] == "_"
+    ) or not variable.replace("_", "a").isalnum():
+        return None
+
+    condition = None
+    if_index = _find_top_level_keyword(result_clause, "if")
+    if if_index >= 0:
+        result_text = result_clause[:if_index].strip()
+        condition_text = result_clause[if_index + 2:].strip()
+        if not result_text or not condition_text:
+            return None
+    else:
+        result_text = result_clause
+        condition_text = None
+
+    grouping = False
+    
+    if is_map and result_text.endswith("..."):
+        grouping = True
+        result_text = result_text[:-3].rstrip()
+
+    if not result_text:
+        return None
+    key = None
+    value_text = result_text
+
+    if is_map:
+        # Terraform object comprehensions use the separator "=>".
+        # The equals sign comes before the greater-than sign.
+        arrow_index = _find_top_level_character(result_text, "=")
+        if (
+            arrow_index < 0
+            or arrow_index + 1 >= len(result_text)
+            or result_text[arrow_index + 1] != ">"
+        ):
+            return None
+
+        key_text = result_text[:arrow_index].strip()
+        value_text = result_text[arrow_index + 2:].strip()
+
+        if not key_text or not value_text:
+            return None
+
+        key = _parse_structured_expression(
+            key_text,
+            for_variables={variable},
+        )
+        if key is None:
+            return None
+
+    collection = _parse_structured_expression(collection_text)
+    value = _parse_structured_expression(
+        value_text,
+        for_variables={variable},
+    )
+
+    if collection is None or value is None:
+        return None
+
+    if condition_text is not None:
+        condition = _parse_structured_expression(
+            condition_text,
+            for_variables={variable},
+        )
+        if condition is None:
+            condition = RawExpression(condition_text)
+
+    return ForExpression(
+        value=value,
+        collection=collection,
+        key=key,
+        variable=variable,
+        condition=condition,
+        grouping=grouping,
+    )
+
+
+
+def _parse_structured_expression(
+    expression: str,
+    for_variables: set[str] | None = None,
+) -> Any | None:
     """Parse common Terraform expressions into typed IR nodes."""
     expression = _strip_outer_parentheses(expression.strip())
+
+    if (
+        expression.startswith("[for ")
+        and expression.endswith("]")
+    ) or (
+        expression.startswith("{for ")
+        and expression.endswith("}")
+    ):
+        return _parse_for_expression(expression)
+
     if expression.startswith("{") and expression.endswith("}"):
         return _parse_map_expression(expression)
+    
+
+    if expression.startswith("[for ") and expression.endswith("]"):
+        return _parse_for_expression(expression)
+
+    if expression.startswith("{") and expression.endswith("}"):
+        return _parse_map_expression(expression)
+
+    if (
+        for_variables
+        and expression.replace("_", "a").isalnum()
+        and (expression[0].isalpha() or expression[0] == "_")
+        and expression in for_variables
+    ):
+        return ForVariableReference(name=expression)
 
     reference = _parse_reference(expression)
     if reference is not None:
@@ -583,9 +762,18 @@ def _parse_structured_expression(expression: str) -> Any | None:
     conditional_parts = _split_conditional(expression)
     if conditional_parts is not None:
         condition_text, true_text, false_text = conditional_parts
-        condition = _parse_structured_expression(condition_text)
-        true_value = _parse_structured_expression(true_text)
-        false_value = _parse_structured_expression(false_text)
+        condition = _parse_structured_expression(
+            condition_text,
+            for_variables=for_variables,
+        )
+        true_value = _parse_structured_expression(
+            true_text,
+            for_variables=for_variables,
+        )
+        false_value = _parse_structured_expression(
+            false_text,
+            for_variables=for_variables,
+        )
 
         if (
             condition is not None
@@ -599,19 +787,41 @@ def _parse_structured_expression(expression: str) -> Any | None:
             )
         return None
 
-    function = _parse_function_call(expression)
+    function = _parse_function_call(
+        expression,
+        for_variables=for_variables,
+    )
     if function is not None:
         return function
 
-    return _parse_expression_atom(expression)
+    return _parse_expression_atom(
+        expression,
+        for_variables=for_variables,
+    )
 
-def _parse_expression_atom(expression: str) -> Any | None:
+
+def _parse_expression_atom(
+    expression: str,
+    for_variables: set[str] | None = None,
+) -> Any | None:
     expression = expression.strip()
+
+    if (
+        for_variables
+        and expression.replace("_", "a").isalnum()
+        and (expression[0].isalpha() or expression[0] == "_")
+        and expression in for_variables
+    ):
+        return ForVariableReference(name=expression)
+
     reference = _parse_reference(expression)
     if reference is not None:
         return reference
 
-    function = _parse_function_call(expression)
+    function = _parse_function_call(
+        expression,
+        for_variables=for_variables,
+    )
     if function is not None:
         return function
 
@@ -629,7 +839,10 @@ def _parse_expression_atom(expression: str) -> Any | None:
         return None
 
 
-def _parse_function_call(expression: str) -> FunctionCall | None:
+def _parse_function_call(
+    expression: str,
+    for_variables: set[str] | None = None,
+) -> FunctionCall | None:
     opening = expression.find("(")
     if opening <= 0 or not expression.endswith(")"):
         return None
@@ -645,7 +858,10 @@ def _parse_function_call(expression: str) -> FunctionCall | None:
     argument_texts = _split_top_level(inner, ",")
     arguments: list[Any] = []
     for argument_text in argument_texts:
-        argument = _parse_structured_expression(argument_text)
+        argument = _parse_structured_expression(
+            argument_text,
+            for_variables=for_variables,
+        )
         if argument is None:
             return None
         arguments.append(argument)

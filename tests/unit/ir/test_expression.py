@@ -102,3 +102,26 @@ def test_resource_reference_remains_usable() -> None:
     )
 
     assert expression.to_string() == "aws_s3_bucket.example.id"
+
+
+def test_for_expression_preserves_list_comprehension_fields() -> None:
+    from iac_converter.ir import ForExpression
+
+    expression = ForExpression(
+        value=FunctionCall(
+            name="upper",
+            arguments=(VariableReference(name="name"),),
+        ),
+        collection=VariableReference(name="names"),
+        variable="name",
+    )
+
+    assert expression.variable == "name"
+    assert expression.collection == VariableReference(name="names")
+    assert expression.value == FunctionCall(
+        name="upper",
+        arguments=(VariableReference(name="name"),),
+    )
+    assert expression.key is None
+    assert expression.condition is None
+    assert expression.grouping is False

@@ -8,6 +8,7 @@ from .expression import (
     FunctionCall,
     Literal,
     RawExpression,
+    ForExpression,
 )
 from .model import ProjectIR
 from .output import Output
@@ -17,6 +18,7 @@ from .reference import (
     LocalReference,
     Reference,
     VariableReference,
+    ForVariableReference
 )
 from .resource import Resource
 from .variable import Variable
@@ -39,4 +41,6 @@ __all__ = [
     "Resource",
     "Variable",
     "VariableReference",
+    "ForExpression",
+    "ForVariableReference",
 ]

@@ -1,154 +1,182 @@
-# IaC Converter Project — Detailed Progress Report
+# IaC Converter — Project Progress Report
 
-This table summarizes what we have done, the current status of each milestone, and what remains to be done, based on our conversation and the test results you shared.
+Based on our work together and the test results you ran through October 29, 2026.
 
-## 1. Overall project status
+## 1. Executive summary
 
-## Latest verified test result
+The IaC Converter has a working foundation for converting Terraform and YAML, handling projects containing multiple files, and preserving increasingly complex Terraform expressions. The latest full test run reported 133 passed, 0 failed in 1.53 seconds.
 
-Passing
+The main priority now is to audit the remaining milestones, confirm what is implemented and tested, and fill any verified gaps—not rebuild components that already exist.
 
-# 128 tests passed
+Full test suite
 
-Full pytest suite · 0.80 seconds
+# 133 passed
 
-Completed milestones: M1 and M2, according to our working roadmap.
+Latest user-reported run; 1.53 seconds
 
-Active milestone: M3 — Advanced Terraform support.
+Conversion and project handling
 
-Remaining verification: M2.2 and M4–M7.
+Implemented and covered by passing tests for the cases verified so far.
 
-## 2. Milestone-by-milestone status
+Remaining milestones
 
-| Milestone | Area                       | Status              | What we have done                                                                                                                                    | What we still have to do                                                                    |
-| --------- | -------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| M1        | Single-file conversion     | Complete            | Basic Terraform ↔ YAML conversion is marked complete on our roadmap.                                                                                 | Address any future defects or uncovered edge cases.                                         |
-| M2        | Project conversion         | Complete            | Multi-resource and project conversion are marked complete.                                                                                           | Verify any additional requirements that arise during the broader audit.                     |
-| M2.2      | Directory loading          | Verification needed | Identified as a separate verification task.                                                                                                          | Test directory discovery, nested files, supported file types, and project loading behavior. |
-| M3        | Advanced Terraform support | In progress         | Recursive nested blocks, collections, function calls, conditionals, map arguments, and splat-expression preservation have been worked on and tested. | Investigate comprehensions, broaden expression coverage, and test more complex round trips. |
-| M4        | Schema validation          | Pending audit       | No detailed audit results have been established in this conversation.                                                                                | Inspect schemas, validation rules, error reporting, and invalid-input handling.             |
-| M5        | API                        | Pending audit       | No detailed audit results have been established in this conversation.                                                                                | Inspect endpoints, request/response models, error handling, and integration tests.          |
-| M6        | Storage                    | Pending audit       | No detailed audit results have been established in this conversation.                                                                                | Inspect persistence, retrieval, updates, deletion, and failure handling as applicable.      |
-| M7        | Execution                  | Pending audit       | No detailed audit results have been established in this conversation.                                                                                | Inspect the execution workflow, process handling, failure reporting, and safety controls.   |
+Schema validation, API, storage, and execution need a fuller implementation and test audit.
 
-Note: “Pending audit” does not mean the feature is missing. We need to inspect and test it before deciding whether changes are required.
+## 2. What we have completed
 
-## 3. M3 — Detailed implementation status
+### M1 — Single-file conversion
 
-This is the milestone we have been actively working on.
+Marked complete
 
-| Feature                       | What we have done                                                              | Current status           | Remaining work                                                                        |
-| ----------------------------- | ------------------------------------------------------------------------------ | ------------------------ | ------------------------------------------------------------------------------------- |
-| Nested Terraform blocks       | Added recursive block support, including labels, attributes, and child blocks. | Implemented              | Test additional nested-block structures and edge cases.                               |
-| Nested lists and maps         | Added or verified conversion to structured collection expressions.             | Tested                   | Expand edge-case coverage.                                                            |
-| Nested function calls         | Tested expressions such as `lower(trimspace(var.bucket_name))`.                | Tested                   | Check more function combinations and argument types.                                  |
-| Conditional expressions       | Added parsing for simple and nested conditionals.                              | Tested                   | Expand coverage for operators and complex conditions.                                 |
-| Conditional inside a function | Tested `lower(var.enabled ? "ACTIVE" : "INACTIVE")`.                           | Tested                   | Check additional combinations.                                                        |
-| Map passed to a function      | Tested `lookup({ primary = "ap-south-1" }, "primary", "us-east-1")`.           | Tested                   | Test more complex map values and keys.                                                |
-| Delimiter parsing             | Fixed the opening/closing brace handling in top-level splitting helpers.       | Regression suite passing | Keep covered by tests.                                                                |
-| Splat expressions             | Added a round-trip test for `var.instances[*].id`; raw text is preserved.      | Tested                   | Investigate other splat forms if required.                                            |
-| List comprehensions           | Diagnostic showed structured parsing returns `None` for an example.            | Needs investigation      | Inspect full compiler behavior, add regression coverage, then implement if necessary. |
-| Object comprehensions         | Diagnostic showed structured parsing returns `None` for an example.            | Needs investigation      | Add support for key/value expressions and optional filters as appropriate.            |
-| Other expression types        | No comprehensive audit yet.                                                    | Not fully assessed       | Evaluate indexing, attribute access, operators, and template/interpolation handling.  |
+- Established the single-file conversion foundation.
+- Terraform and YAML parsing and generation modules exist.
+- Conversion and round-trip behavior has test coverage.
 
-### Examples already tested
+The milestone was previously marked complete in our project tracking; this session did not re-audit every single-file scenario.
 
-Nested function calls:
+### M2 — Project conversion
 
-```
-lower(trimspace(var.bucket_name))
-```
+Marked complete
 
-Conditional expressions:
+- Project-level Terraform and YAML compiler/generator modules exist.
+- Multi-file project conversion and round-trip tests exist.
+- Project conversion tests passed during previous verification.
 
-```
-var.enabled ? "ACTIVE" : "INACTIVE"
-```
+### M2.2 — Directory loading
 
-Map arguments:
+Verified by targeted tests
 
-```
-lookup({ primary = "ap-south-1" }, "primary", "us-east-1")
-```
+The following nine tests passed:
 
-Splat expression:
+| Test area                                          | Result |
+| -------------------------------------------------- | ------ |
+| Recursive file loading                             | Passed |
+| Preserving file contents                           | Passed |
+| Empty directories                                  | Passed |
+| Rejecting missing paths                            | Passed |
+| Rejecting file paths where a directory is expected | Passed |
+| Accepting string paths                             | Passed |
+| Normalizing nested paths                           | Passed |
+| Terraform project round trip                       | Passed |
+| Terraform-to-YAML project conversion               | Passed |
 
-```
-var.instances[*].id
-```
+Result: 9 passed in 0.70 seconds.
 
-### Known expression gaps to investigate
+### M3 — Advanced Terraform expression support
 
-List comprehension:
+Progress verified
 
-```
-[for name in var.names : upper(name)]
-```
+The implementation and tests cover these expression types:
 
-Object comprehension:
+Nested collections
 
-```
-{for name in var.names : name => upper(name)}
-```
+Nested maps and lists, including references inside collections.
 
-For these last two examples, the diagnostic was run against `_parse_structured_expression()` directly and returned `None`. We have not yet established whether the full compiler preserves them as `RawExpression`, or whether any end-to-end round-trip issue exists.
+Function calls
 
-## 4. Test and regression status
+Nested calls and calls with collection arguments.
 
-| Checkpoint                                   | Result reported by you | Significance                                  |
-| -------------------------------------------- | ---------------------- | --------------------------------------------- |
-| Earlier full suite                           | 123 passed             | Baseline before recent expression work        |
-| After nested conditional work                | 125 passed             | Nested conditional changes tested             |
-| After conditional function-argument support  | 126 passed             | Recursive function-argument parsing tested    |
-| After map-argument support and delimiter fix | 127 passed             | Map argument round trip and full suite passed |
-| After splat-expression test                  | 128 passed             | Splat preservation and full suite passed      |
+Conditional expressions
 
-These results show that the test suite has grown as we added regression tests. They do not by themselves establish complete Terraform language compatibility.
+Nested conditionals and conditionals inside function calls.
 
-## 5. Remaining work — recommended order
+Splat expressions
 
-| Order | Task                                                          | Expected result                                                     |
-| ----- | ------------------------------------------------------------- | ------------------------------------------------------------------- |
-| 1     | Inspect the full compiler's handling of a list comprehension. | Determine whether it is preserved as raw text or needs a fix.       |
-| 2     | Add a list-comprehension regression test.                     | Establish expected Terraform → IR → Terraform behavior.             |
-| 3     | Implement structured comprehension support if needed.         | Improve expression understanding without losing unsupported syntax. |
-| 4     | Add object-comprehension coverage.                            | Verify key/value expressions and filters.                           |
-| 5     | Run the focused tests and full suite.                         | Catch regressions after each change.                                |
-| 6     | Verify M2.2 directory loading.                                | Confirm directory-based project loading behavior.                   |
-| 7     | Audit M4 schema validation.                                   | Identify and close validation gaps.                                 |
-| 8     | Audit M5 API.                                                 | Confirm endpoints and error handling.                               |
-| 9     | Audit M6 storage.                                             | Confirm persistence and retrieval behavior.                         |
-| 10    | Audit M7 execution.                                           | Confirm execution behavior and safety controls.                     |
+Round-trip test coverage exists.
 
-## 6. Immediate next action
+List comprehensions
 
-Continue with the list-comprehension diagnostic we prepared. Run this command from `C:\Users\SreenivasReddyDaram\iac-tool`:
+Basic and filtered list-comprehension tests.
 
-```
-@'
-from iac_converter.compiler.terraform_to_ir import parse_terraform
-from iac_converter.ir import RawExpression
+Map comprehensions
 
-source = """
-variable "names" {
-  type    = list(string)
-  default = ["alpha", "beta"]
-}
+Basic map comprehensions plus grouped, filtered map-comprehension round-trip coverage.
 
-output "upper_names" {
-  value = [for name in var.names : upper(name)]
-}
-"""
+Recent improvements included fixing the map-comprehension `=>` parsing issue, handling grouping syntax, and adding regression assertions that grouping, filtering, key, and value survive reparsing.
 
-project = parse_terraform(source)
-value = project.outputs[0].value
+The focused grouped-map test passed, followed by the full suite: 133 passed.
 
-print("IR type:", type(value).__name__)
-print("IR value:", repr(value))
-print("Is raw expression:", isinstance(value, RawExpression))
-'@ | .\.venv\Scripts\python.exe -
-```
+Important scope note: this verifies the tested expression cases, not complete compatibility with every Terraform expression or language feature.
 
-Paste the output, and we can proceed with a specific, test-driven next step.
+## 3. What remains to do
 
-Summary: The latest reported suite is green at 128 passing tests. M1 and M2 are marked complete on our working roadmap; M3 is active; M2.2 needs verification; and M4–M7 need audits before we can confidently mark them complete.
+The following milestones have not yet been fully audited. Existing source modules confirm that code is present, but their existence alone does not prove that all required behavior works.
+
+M4 — Schema validation
+
+Audit next
+
+Existing modules: `schema/provider_schema.py`, `schema/yaml_schema.py`
+
+- Inspect supported schemas and validation rules.
+- Verify valid inputs are accepted and invalid inputs produce useful errors.
+- Check malformed YAML, missing required fields, and type mismatches.
+- Confirm validation errors are surfaced consistently through conversion paths.
+
+M5 — API
+
+Audit pending
+
+Existing module: `api/app.py`
+
+- Identify available endpoints and request/response formats.
+- Test successful conversion requests.
+- Test invalid input, validation errors, and unsupported conversions.
+- Check HTTP status codes and error responses.
+- Verify API tests and documentation.
+
+M6 — Storage and project persistence
+
+Partially verified
+
+Existing modules: `project/archive.py`, `project/loader.py`, `project/writer.py`, `project/project.py`
+
+- Review archive creation and extraction behavior.
+- Verify writing projects preserves directory structure and file contents.
+- Check invalid archives, path traversal protections, and error handling.
+- Determine whether persistent storage is required beyond filesystem and archive handling.
+
+M7 — Execution and orchestration
+
+Unclear scope
+
+No obviously named execution module appeared in the source listing.
+
+- Establish what “execution” means for this project.
+- Search for existing orchestration, subprocess, CLI, or workflow code.
+- If execution means running Terraform commands, verify command handling, timeouts, exit codes, and safety boundaries.
+- Implement only the missing functionality that the project requirements actually call for.
+
+## 4. Repository and quality follow-ups
+
+These are additional checks, separate from the milestone work.
+
+- Modified bytecode files: Git status showed four modified files under `__pycache__`. Inspect why generated files are tracked or changing, and check ignore rules. Do not remove or revert them until their repository status is understood.
+- Working-tree preservation: Several source and test files are intentionally modified. Keep those changes intact.
+- Regression coverage: Continue adding focused tests for each verified bug or missing behavior, then run the full suite.
+- Documentation: Review `f.md` and `plan-documents/` as appropriate to reconcile the actual implementation with the intended roadmap. Preserve these files and other unrelated work.
+- Release readiness: Once M4–M7 are audited, run linting, type checks, packaging/build checks, and any configured coverage checks.
+
+## 5. Recommended execution plan
+
+1. Audit test inventory. List test files and map them to M4–M7.
+2. Verify M4. Run schema-validation tests and inspect missing positive and negative cases.
+3. Verify M5. Inspect `api/app.py`, identify the API framework and endpoints, then run relevant API tests.
+4. Verify M6. Run archive, loader, and writer tests; inspect safety and persistence requirements.
+5. Clarify and verify M7. Establish the intended execution scope before adding modules.
+6. Final quality gate. Run the full test suite and project checks, review the final Git status, and update the roadmap based on evidence.
+
+## 6. Current status at a glance
+
+| Milestone                       | Current assessment                                                    |
+| ------------------------------- | --------------------------------------------------------------------- |
+| M1 — Single-file conversion     | Marked complete                                                       |
+| M2 — Project conversion         | Marked complete                                                       |
+| M2.2 — Directory loading        | Verified by 9 targeted passing tests                                  |
+| M3 — Advanced Terraform support | Key expression cases verified; broader compatibility remains to audit |
+| M4 — Schema validation          | Existing modules; audit pending                                       |
+| M5 — API                        | Existing module; audit pending                                        |
+| M6 — Storage                    | Project filesystem/archive functionality exists; audit pending        |
+| M7 — Execution                  | Scope and implementation need investigation                           |
+
+Bottom line: The strongest verified result is the passing 133-test suite, including the recent comprehension fixes and regression coverage. The next priority is M4 schema validation, followed by the API and storage audits. M7 should be defined from your project requirements before implementation begins.

@@ -10,6 +10,7 @@ from iac_converter.ir import (
     CollectionExpression,
     DataSourceReference,
     FunctionCall,
+    ForExpression,
     Literal,
     LocalReference,
     Output,
@@ -20,6 +21,7 @@ from iac_converter.ir import (
     Resource,
     Variable,
     VariableReference,
+    ForVariableReference
 )
 
 
@@ -537,6 +539,7 @@ class TerraformGenerator:
                 DataSourceReference,
                 VariableReference,
                 LocalReference,
+                ForVariableReference,
             ),
         ):
             return value.to_string()
@@ -553,6 +556,7 @@ class TerraformGenerator:
                 for argument in value.arguments
             )
             return f"{value.name}({arguments})"
+        
 
         if isinstance(value, ConditionalExpression):
             condition = self._render_value(value.condition, expression=True)
@@ -567,6 +571,47 @@ class TerraformGenerator:
                 false_value = f"({false_value})"
 
             return f"{condition} ? {true_value} : {false_value}"
+        if isinstance(value, ForExpression):
+            collection = self._render_value(
+                value.collection,
+                expression=True,
+            )
+            result = self._render_value(value.value)
+
+            if value.grouping and value.key is None:
+                raise TerraformGenerationError(
+                    "Grouping mode is only valid for object comprehensions"
+                )
+
+            if value.key is not None:
+                key = self._render_value(value.key)
+                result = f"{key} => {result}"
+
+            # Terraform requires the grouping ellipsis immediately after the
+            # object-comprehension value, before an optional `if` clause.
+            if value.grouping:
+                result += "..."
+
+            if value.key_variable is not None:
+                iterator = f"{value.key_variable}, {value.variable}"
+            else:
+                iterator = value.variable
+
+            expression_text = (
+                f"for {iterator} in {collection} : {result}"
+            )
+
+            if value.condition is not None:
+                condition = self._render_value(
+                    value.condition,
+                    expression=True,
+                )
+                expression_text += f" if {condition}"
+
+            if value.key is not None:
+                return "{" + expression_text + "}"
+
+            return "[" + expression_text + "]"
 
         if isinstance(value, CollectionExpression):
             if value.kind in {"list", "tuple"}:
