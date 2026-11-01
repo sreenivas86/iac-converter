@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from iac_converter.compiler import (
@@ -17,6 +18,52 @@ from iac_converter.project import (
     load_project,
     save_project,
 )
+
+
+def _validate_input_file(path: Path) -> None:
+    if not path.exists():
+        raise FileNotFoundError(f"Input file does not exist: {path}")
+    if not path.is_file():
+        raise ValueError(f"Input path is not a file: {path}")
+
+
+def _validate_input_directory(path: Path) -> None:
+    if not path.exists():
+        raise FileNotFoundError(f"Input directory does not exist: {path}")
+    if not path.is_dir():
+        raise ValueError(f"Input path is not a directory: {path}")
+
+
+def _validate_output_file(path: Path, input_path: Path) -> None:
+    if path.exists() and not path.is_file():
+        raise ValueError(f"Output path is not a file: {path}")
+
+    if path.resolve() == input_path.resolve():
+        raise ValueError("Input and output file paths must be different.")
+
+
+def _validate_output_file_outside_directory(
+    output_path: Path,
+    input_directory: Path,
+) -> None:
+    if output_path.exists() and not output_path.is_file():
+        raise ValueError(f"Output path is not a file: {output_path}")
+
+    output_resolved = output_path.resolve()
+    input_resolved = input_directory.resolve()
+
+    if output_resolved == input_resolved or input_resolved in output_resolved.parents:
+        raise ValueError(
+            "Output file must not be the same as or inside the input project directory."
+        )
+
+
+def _validate_output_directory(path: Path, input_path: Path) -> None:
+    if path.exists() and not path.is_dir():
+        raise ValueError(f"Output path is not a directory: {path}")
+
+    if path.resolve() == input_path.resolve():
+        raise ValueError("Input and output paths must be different.")
 
 
 def _write_file(path: Path, content: str) -> None:
@@ -55,6 +102,17 @@ def build_parser() -> argparse.ArgumentParser:
         description="Bidirectional YAML and Terraform converter.",
     )
 
+    try:
+        package_version = version("iac-converter")
+    except PackageNotFoundError:
+        package_version = "unknown"
+
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {package_version}",
+    )
+
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     commands = [
@@ -62,31 +120,31 @@ def build_parser() -> argparse.ArgumentParser:
             "yaml-to-terraform",
             "Convert a YAML file to a Terraform file.",
             "input",
-            "output",
         ),
         (
             "terraform-to-yaml",
             "Convert a Terraform project directory to YAML.",
             "input_dir",
-            "output_file",
         ),
         (
             "yaml-project-to-terraform",
             "Convert a YAML project file to a Terraform project directory.",
             "input",
-            "output_dir",
         ),
         (
             "terraform-project-to-yaml",
             "Convert a Terraform project directory to YAML.",
             "input_dir",
-            "output_file",
         ),
     ]
 
-    for name, description, input_name, output_name in commands:
+    for name, description, input_name in commands:
         command_parser = subparsers.add_parser(name, help=description)
-        command_parser.add_argument(input_name, type=Path, help="Input path.")
+        command_parser.add_argument(
+            input_name,
+            type=Path,
+            help="Input path.",
+        )
         command_parser.add_argument(
             "-o",
             "--output",
@@ -96,6 +154,18 @@ def build_parser() -> argparse.ArgumentParser:
             help="Output file or directory.",
         )
 
+        verbosity = command_parser.add_mutually_exclusive_group()
+        verbosity.add_argument(
+            "--verbose",
+            action="store_true",
+            help="Show detailed conversion information.",
+        )
+        verbosity.add_argument(
+            "--quiet",
+            action="store_true",
+            help="Suppress successful conversion messages.",
+        )
+
     return parser
 
 
@@ -103,20 +173,46 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    if args.verbose:
+        print(f"Running command: {args.command}", file=sys.stderr)
+
     try:
         if args.command == "yaml-to-terraform":
+            _validate_input_file(args.input)
+            _validate_output_file(args.output, args.input)
             yaml_to_terraform(args.input, args.output)
+
         elif args.command == "terraform-to-yaml":
+            _validate_input_directory(args.input_dir)
+            _validate_output_file_outside_directory(
+                args.output,
+                args.input_dir,
+            )
             terraform_to_yaml(args.input_dir, args.output)
+
         elif args.command == "yaml-project-to-terraform":
+            _validate_input_file(args.input)
+            _validate_output_directory(args.output, args.input)
             yaml_project_to_terraform(args.input, args.output)
+
         elif args.command == "terraform-project-to-yaml":
+            _validate_input_directory(args.input_dir)
+            _validate_output_file_outside_directory(
+                args.output,
+                args.input_dir,
+            )
             terraform_project_to_yaml(args.input_dir, args.output)
+
     except (OSError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    print("Conversion completed successfully.")
+    if not args.quiet:
+        if args.verbose:
+            print(f"Output written to: {args.output}")
+        else:
+            print("Conversion completed successfully.")
+
     return 0
 
 

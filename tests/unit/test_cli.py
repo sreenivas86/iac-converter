@@ -168,3 +168,70 @@ def test_cli_returns_error_for_missing_input(tmp_path: Path) -> None:
 
     assert result == 1
     assert not output_file.exists()
+
+
+def test_cli_displays_version(capsys) -> None:
+    import pytest
+
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--version"])
+
+    assert exc_info.value.code == 0
+
+    output = capsys.readouterr().out
+    assert output.startswith("iac-converter ")
+    assert "0.1.0" in output
+
+
+def test_cli_quiet_suppresses_success_message(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    input_file = tmp_path / "project.yaml"
+    output_file = tmp_path / "main.tf"
+
+    input_file.write_text(YAML_SOURCE, encoding="utf-8")
+
+    result = main(
+        [
+            "yaml-to-terraform",
+            str(input_file),
+            "--output",
+            str(output_file),
+            "--quiet",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.out == ""
+    assert captured.err == ""
+    assert output_file.exists()
+
+
+def test_cli_verbose_displays_conversion_information(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    input_file = tmp_path / "project.yaml"
+    output_file = tmp_path / "main.tf"
+
+    input_file.write_text(YAML_SOURCE, encoding="utf-8")
+
+    result = main(
+        [
+            "yaml-to-terraform",
+            str(input_file),
+            "--output",
+            str(output_file),
+            "--verbose",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert "Running command: yaml-to-terraform" in captured.err
+    assert f"Output written to: {output_file}" in captured.out
+    assert output_file.exists()
