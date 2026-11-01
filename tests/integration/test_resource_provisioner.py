@@ -45,13 +45,9 @@ resources:
 
     assert provisioner["type"] == "local-exec"
 
-    assert provisioner["properties"]["command"] == RawExpression(
-        '"echo ${self.id}"'
-    )
+    assert provisioner["properties"]["command"] == RawExpression('"echo ${self.id}"')
 
-    assert provisioner["properties"]["working_dir"] == Literal(
-        "/tmp"
-    )
+    assert provisioner["properties"]["working_dir"] == Literal("/tmp")
 
     # ---------------------------------------------------------
     # ProjectIR -> Terraform
@@ -92,10 +88,6 @@ resources:
 
     assert round_trip_provisioner["type"] == "local-exec"
 
-    assert round_trip_provisioner["properties"]["command"] == RawExpression(
-        '"echo ${self.id}"'
-    )
+    assert round_trip_provisioner["properties"]["command"] == RawExpression('"echo ${self.id}"')
 
-    assert round_trip_provisioner["properties"]["working_dir"] == Literal(
-        "/tmp"
-    )
+    assert round_trip_provisioner["properties"]["working_dir"] == Literal("/tmp")

@@ -27,9 +27,10 @@ def parse_terraform(source: str) -> ProjectIR:
     try:
         document = hcl2.load(io.StringIO(source))
     except Exception as exc:
-        raise TerraformParseError(
-            f"Invalid Terraform configuration: {exc}"
-        ) from exc
+        raise TerraformParseError(f"Invalid Terraform configuration: {exc}") from exc
+
+    if not isinstance(document, dict):
+        raise TerraformParseError("Invalid Terraform configuration: expected a dictionary.")
 
     return _to_ir(document)
 
@@ -56,7 +57,12 @@ def _parse_terraform_block(
         return {}
 
     # Terraform normally has one terraform block.
-    return _convert_value(blocks[0])
+    result = _convert_value(blocks[0])
+
+    if not isinstance(result, dict):
+        return {}
+
+    return result
 
 
 def _parse_providers(
@@ -108,25 +114,15 @@ def _parse_variables(
             variables.append(
                 Variable(
                     name=_strip_hcl_quotes(name),
-                    type=_convert_value(
-                        configuration.get("type")
-                    ),
-                    description=_unwrap_literal(
-                        configuration.get("description")
-                    ),
-                    default=_convert_value(
-                        configuration.get("default")
-                    ),
+                    type=_convert_value(configuration.get("type")),
+                    description=_unwrap_literal(configuration.get("description")),
+                    default=_convert_value(configuration.get("default")),
                     sensitive=_unwrap_bool(
                         configuration.get("sensitive"),
                         default=False,
                     ),
-                    nullable=_unwrap_optional_bool(
-                        configuration.get("nullable")
-                    ),
-                    validation=_parse_validation(
-                        configuration.get("validation")
-                    ),
+                    nullable=_unwrap_optional_bool(configuration.get("nullable")),
+                    validation=_parse_validation(configuration.get("validation")),
                 )
             )
 
@@ -142,10 +138,7 @@ def _parse_validation(
     if not isinstance(value, list):
         return []
 
-    return [
-        _convert_value(item)
-        for item in value
-    ]
+    return [_convert_value(item) for item in value]
 
 
 def _parse_resources(
@@ -169,71 +162,17 @@ def _parse_resources(
                     Resource(
                         type=_strip_hcl_quotes(resource_type),
                         name=_strip_hcl_quotes(resource_name),
-                        attributes=_parse_resource_attributes(
-                            configuration
-                        ),
-                        blocks=_parse_nested_blocks(
-                            configuration
-                        ),
-                        count=_convert_value(
-                            configuration.get("count")
-                        ),
-                        for_each=_convert_value(
-                            configuration.get("for_each")
-                        ),
-                        depends_on=_convert_value(
-                            configuration.get("depends_on", [])
-                        ),
-                        lifecycle=_convert_block(
-                            configuration.get("lifecycle")
-                        ),
-                        provisioners=_parse_provisioners(
-                            configuration.get("provisioner")
-                        ),
+                        attributes=_parse_resource_attributes(configuration),
+                        blocks=_parse_nested_blocks(configuration),
+                        count=_convert_value(configuration.get("count")),
+                        for_each=_convert_value(configuration.get("for_each")),
+                        depends_on=_convert_value(configuration.get("depends_on", [])),
+                        lifecycle=_convert_block(configuration.get("lifecycle")),
+                        provisioners=_parse_provisioners(configuration.get("provisioner")),
                     )
                 )
 
     return resources
-
-
-def _parse_nested_blocks(
-    configuration: dict[str, Any],
-) -> list[Block]:
-    blocks: list[Block] = []
-
-    meta_arguments = {
-        "count",
-        "for_each",
-        "depends_on",
-        "lifecycle",
-        "provisioner",
-        "connection",
-        "__is_block__",
-    }
-
-    for key, value in configuration.items():
-        if key in meta_arguments:
-            continue
-
-        if not isinstance(value, list):
-            continue
-
-        for item in value:
-            if not isinstance(item, dict):
-                continue
-
-            if "__is_block__" not in item:
-                continue
-
-            blocks.append(
-                Block(
-                    type=_strip_hcl_quotes(key),
-                    attributes=_parse_block_attributes(item),
-                    blocks=_parse_nested_blocks(item),
-                )
-            )
-
-    return blocks
 
 
 def _parse_block_attributes(
@@ -242,8 +181,7 @@ def _parse_block_attributes(
     return {
         key: _convert_value(value)
         for key, value in configuration.items()
-        if key != "__is_block__"
-        and not _is_nested_block_value(value)
+        if key != "__is_block__" and not _is_nested_block_value(value)
     }
 
 
@@ -306,8 +244,7 @@ def _parse_resource_attributes(
     return {
         key: _convert_value(value)
         for key, value in configuration.items()
-        if key not in meta_arguments
-        and not _is_nested_block_value(value)
+        if key not in meta_arguments and not _is_nested_block_value(value)
     }
 
 
@@ -317,10 +254,7 @@ def _is_nested_block_value(
     if not isinstance(value, list):
         return False
 
-    return any(
-        isinstance(item, dict) and "__is_block__" in item
-        for item in value
-    )
+    return any(isinstance(item, dict) and "__is_block__" in item for item in value)
 
 
 def _parse_data_sources(
@@ -349,9 +283,7 @@ def _parse_data_sources(
                             for key, value in configuration.items()
                             if key != "__is_block__"
                         },
-                        depends_on=_convert_value(
-                            configuration.get("depends_on", [])
-                        ),
+                        depends_on=_convert_value(configuration.get("depends_on", [])),
                     )
                 )
 
@@ -374,19 +306,13 @@ def _parse_outputs(
             outputs.append(
                 Output(
                     name=_strip_hcl_quotes(name),
-                    value=_convert_value(
-                        configuration.get("value")
-                    ),
-                    description=_unwrap_literal(
-                        configuration.get("description")
-                    ),
+                    value=_convert_value(configuration.get("value")),
+                    description=_unwrap_literal(configuration.get("description")),
                     sensitive=_unwrap_bool(
                         configuration.get("sensitive"),
                         default=False,
                     ),
-                    depends_on=_convert_value(
-                        configuration.get("depends_on")
-                    ),
+                    depends_on=_convert_value(configuration.get("depends_on")),
                 )
             )
 
@@ -424,22 +350,13 @@ def _convert_block(
     if isinstance(value, list):
         if len(value) == 1 and isinstance(value[0], dict):
             return {
-                key: _convert_value(item)
-                for key, item in value[0].items()
-                if key != "__is_block__"
+                key: _convert_value(item) for key, item in value[0].items() if key != "__is_block__"
             }
 
-        return {
-            str(index): _convert_value(item)
-            for index, item in enumerate(value)
-        }
+        return {str(index): _convert_value(item) for index, item in enumerate(value)}
 
     if isinstance(value, dict):
-        return {
-            key: _convert_value(item)
-            for key, item in value.items()
-            if key != "__is_block__"
-        }
+        return {key: _convert_value(item) for key, item in value.items() if key != "__is_block__"}
 
     return {}
 
@@ -452,17 +369,10 @@ def _convert_value(
         return None
 
     if isinstance(value, dict):
-        return {
-            key: _convert_value(item)
-            for key, item in value.items()
-            if key != "__is_block__"
-        }
+        return {key: _convert_value(item) for key, item in value.items() if key != "__is_block__"}
 
     if isinstance(value, list):
-        return [
-            _convert_value(item)
-            for item in value
-        ]
+        return [_convert_value(item) for item in value]
 
     if isinstance(value, str):
         return _convert_string(value)
@@ -530,10 +440,7 @@ def _parse_reference(
     """
     expression = expression.strip()
 
-    if any(
-        char in expression
-        for char in ("?", ":", "(", ")", "[", "]", ",")
-    ):
+    if any(char in expression for char in ("?", ":", "(", ")", "[", "]", ",")):
         return None
 
     parts = expression.split(".")
@@ -663,10 +570,7 @@ def _parse_nested_blocks(
 
                 # A labeled HCL block stores its labels as dictionary keys.
                 # A label maps to the configuration dictionary for that block.
-                if (
-                    isinstance(item_value, dict)
-                    and item_key not in meta_arguments
-                ):
+                if isinstance(item_value, dict) and item_key not in meta_arguments:
                     labels.append(_strip_hcl_quotes(item_key))
                     block_configuration = item_value
                     break
@@ -678,12 +582,8 @@ def _parse_nested_blocks(
                 Block(
                     type=_strip_hcl_quotes(key),
                     labels=labels,
-                    attributes=_parse_block_attributes(
-                        block_configuration
-                    ),
-                    blocks=_parse_nested_blocks(
-                        block_configuration
-                    ),
+                    attributes=_parse_block_attributes(block_configuration),
+                    blocks=_parse_nested_blocks(block_configuration),
                 )
             )
 

@@ -9,12 +9,17 @@ src/iac_converter.egg-info/top_level.txt
 src/iac_converter/api/__init__.py
 src/iac_converter/api/app.py
 src/iac_converter/compiler/__init__.py
+src/iac_converter/compiler/terraform_project.py
 src/iac_converter/compiler/terraform_to_ir.py
+src/iac_converter/compiler/yaml_project.py
 src/iac_converter/compiler/yaml_to_ir.py
 src/iac_converter/generator/__init__.py
 src/iac_converter/generator/terraform.py
+src/iac_converter/generator/terraform_project.py
 src/iac_converter/generator/yaml.py
+src/iac_converter/generator/yaml_project.py
 src/iac_converter/ir/__init__.py
+src/iac_converter/ir/block.py
 src/iac_converter/ir/data_source.py
 src/iac_converter/ir/expression.py
 src/iac_converter/ir/model.py
@@ -28,7 +33,9 @@ src/iac_converter/parser/terraform_parser.py
 src/iac_converter/parser/yaml_parser.py
 src/iac_converter/project/__init__.py
 src/iac_converter/project/archive.py
+src/iac_converter/project/loader.py
 src/iac_converter/project/project.py
+src/iac_converter/project/writer.py
 src/iac_converter/schema/__init__.py
 src/iac_converter/schema/provider_schema.py
 src/iac_converter/schema/yaml_schema.py

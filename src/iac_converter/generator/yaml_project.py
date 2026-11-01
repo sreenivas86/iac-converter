@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from typing import Any
@@ -34,36 +33,25 @@ def generate_yaml_project(project: ProjectIR) -> str:
 
     if project.providers:
         document["providers"] = {
-            provider.name: _provider_to_dict(provider)
-            for provider in project.providers
+            provider.name: _provider_to_dict(provider) for provider in project.providers
         }
 
     if project.variables:
-        document["variables"] = [
-            _variable_to_dict(variable)
-            for variable in project.variables
-        ]
+        document["variables"] = [_variable_to_dict(variable) for variable in project.variables]
 
     if project.locals:
         document["locals"] = _convert_mapping(project.locals)
 
     if project.data_sources:
         document["data_sources"] = [
-            _data_source_to_dict(data_source)
-            for data_source in project.data_sources
+            _data_source_to_dict(data_source) for data_source in project.data_sources
         ]
 
     if project.resources:
-        document["resources"] = [
-            _resource_to_dict(resource)
-            for resource in project.resources
-        ]
+        document["resources"] = [_resource_to_dict(resource) for resource in project.resources]
 
     if project.outputs:
-        document["outputs"] = [
-            _output_to_dict(output)
-            for output in project.outputs
-        ]
+        document["outputs"] = [_output_to_dict(output) for output in project.outputs]
 
     try:
         content = yaml.safe_dump(
@@ -73,9 +61,7 @@ def generate_yaml_project(project: ProjectIR) -> str:
             allow_unicode=True,
         )
     except yaml.YAMLError as exc:
-        raise YAMLProjectGenerationError(
-            f"Failed to generate YAML project: {exc}"
-        ) from exc
+        raise YAMLProjectGenerationError(f"Failed to generate YAML project: {exc}") from exc
 
     # Keep the project version visually consistent with our YAML contract.
     if content.startswith("version: '1'"):
@@ -191,10 +177,7 @@ def _output_to_dict(output: Any) -> dict[str, Any]:
 
 
 def _convert_mapping(value: dict[str, Any]) -> dict[str, Any]:
-    return {
-        key: _convert_value(item)
-        for key, item in value.items()
-    }
+    return {key: _convert_value(item) for key, item in value.items()}
 
 
 def _convert_value(value: Any) -> Any:
@@ -220,10 +203,7 @@ def _convert_value(value: Any) -> Any:
         }
 
     if isinstance(value, dict):
-        return {
-            key: _convert_value(item)
-            for key, item in value.items()
-        }
+        return {key: _convert_value(item) for key, item in value.items()}
 
     if isinstance(value, list):
         return [_convert_value(item) for item in value]
@@ -232,4 +212,3 @@ def _convert_value(value: Any) -> Any:
         return [_convert_value(item) for item in value]
 
     return value
-

@@ -1,4 +1,3 @@
-
 from pathlib import Path
 
 from iac_converter.compiler import parse_terraform_project, parse_yaml_project
@@ -110,14 +109,8 @@ output "bucket_id" {
     original_variable = original_ir.variables[0]
 
     assert round_trip_variable.name == original_variable.name
-    assert (
-        round_trip_variable.description
-        == original_variable.description
-    )
-    assert (
-        round_trip_variable.default
-        == original_variable.default
-    )
+    assert round_trip_variable.description == original_variable.description
+    assert round_trip_variable.default == original_variable.default
 
     # Resources.
     assert len(round_trip_ir.resources) == len(original_ir.resources)
@@ -135,10 +128,7 @@ output "bucket_id" {
     # YAML:
     #   bucket:
     #     expression: var.bucket_name
-    assert (
-        round_trip_resource.attributes["bucket"]
-        == original_resource.attributes["bucket"]
-    )
+    assert round_trip_resource.attributes["bucket"] == original_resource.attributes["bucket"]
 
     # Resource nested map.
     assert (
@@ -162,4 +152,3 @@ output "bucket_id" {
     # The output contains a Reference, so this compares the
     # Reference objects directly.
     assert round_trip_output.value == original_output.value
-

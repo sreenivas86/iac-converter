@@ -5,12 +5,13 @@ from typing import Any
 
 from iac_converter.ir import (
     Block,
-    DataSource,
-    ConditionalExpression,
     CollectionExpression,
+    ConditionalExpression,
+    DataSource,
     DataSourceReference,
-    FunctionCall,
     ForExpression,
+    ForVariableReference,
+    FunctionCall,
     Literal,
     LocalReference,
     Output,
@@ -21,7 +22,6 @@ from iac_converter.ir import (
     Resource,
     Variable,
     VariableReference,
-    ForVariableReference
 )
 
 
@@ -57,12 +57,7 @@ class TerraformGenerator:
         for output in project.outputs:
             sections.append(self._output_block(output))
 
-        return (
-            "\n\n".join(
-                section for section in sections if section.strip()
-            )
-            + "\n"
-        )
+        return "\n\n".join(section for section in sections if section.strip()) + "\n"
 
     # ------------------------------------------------------------------
     # Top-level blocks
@@ -113,9 +108,7 @@ class TerraformGenerator:
             arguments.append(("type", variable.type))
 
         if variable.description is not None:
-            arguments.append(
-                ("description", variable.description)
-            )
+            arguments.append(("description", variable.description))
 
         if variable.default is not None:
             arguments.append(("default", variable.default))
@@ -248,9 +241,7 @@ class TerraformGenerator:
                 )
             )
 
-        body = "\n".join(
-            line for line in lines if line
-        )
+        body = "\n".join(line for line in lines if line)
 
         return self._block(
             header=f'resource "{resource.type}" "{resource.name}"',
@@ -301,10 +292,7 @@ class TerraformGenerator:
         header = block.type
 
         if block.labels:
-            header += " " + " ".join(
-                json.dumps(label)
-                for label in block.labels
-            )
+            header += " " + " ".join(json.dumps(label) for label in block.labels)
 
         lines: list[str] = []
 
@@ -316,9 +304,7 @@ class TerraformGenerator:
             )
 
             if attributes:
-                lines.extend(
-                    attributes.splitlines()
-                )
+                lines.extend(attributes.splitlines())
 
         # Child nested blocks.
         for child in block.blocks:
@@ -329,18 +315,12 @@ class TerraformGenerator:
                 )
             )
 
-        body = "\n".join(
-            line for line in lines if line
-        )
+        body = "\n".join(line for line in lines if line)
 
         if not body:
             return f"{indentation}{header} {{}}"
 
-        return (
-            f"{indentation}{header} {{\n"
-            f"{body}\n"
-            f"{indentation}}}"
-        )
+        return f"{indentation}{header} {{\n{body}\n{indentation}}}"
 
     # ------------------------------------------------------------------
     # Rendering
@@ -364,10 +344,7 @@ class TerraformGenerator:
                     key,
                     value,
                     level=level,
-                    expression=(
-                        expression_values
-                        or key in special_expression_keys
-                    ),
+                    expression=(expression_values or key in special_expression_keys),
                 )
             )
 
@@ -420,11 +397,7 @@ class TerraformGenerator:
 
         body = "\n".join(lines)
 
-        return (
-            f"{indentation}lifecycle {{\n"
-            f"{body}\n"
-            f"{indentation}}}"
-        )
+        return f"{indentation}lifecycle {{\n{body}\n{indentation}}}"
 
     def _render_provisioner_block(
         self,
@@ -434,9 +407,7 @@ class TerraformGenerator:
         provisioner_type = provisioner.get("type")
 
         if not isinstance(provisioner_type, str):
-            raise TerraformGenerationError(
-                "Provisioner 'type' must be a string"
-            )
+            raise TerraformGenerationError("Provisioner 'type' must be a string")
 
         properties = provisioner.get(
             "properties",
@@ -444,15 +415,11 @@ class TerraformGenerator:
         )
 
         if not isinstance(properties, dict):
-            raise TerraformGenerationError(
-                "Provisioner 'properties' must be an object"
-            )
+            raise TerraformGenerationError("Provisioner 'properties' must be an object")
 
         indentation = self._indent(level)
 
-        lines: list[str] = [
-            f'{indentation}provisioner "{provisioner_type}" {{'
-        ]
+        lines: list[str] = [f'{indentation}provisioner "{provisioner_type}" {{']
 
         if properties:
             lines.append(
@@ -466,9 +433,7 @@ class TerraformGenerator:
 
         if connection is not None:
             if not isinstance(connection, dict):
-                raise TerraformGenerationError(
-                    "Provisioner 'connection' must be an object"
-                )
+                raise TerraformGenerationError("Provisioner 'connection' must be an object")
 
             lines.append(
                 self._render_connection_block(
@@ -477,9 +442,7 @@ class TerraformGenerator:
                 )
             )
 
-        lines.append(
-            f"{indentation}}}"
-        )
+        lines.append(f"{indentation}}}")
 
         return "\n".join(lines)
 
@@ -495,11 +458,7 @@ class TerraformGenerator:
             level=level + 1,
         )
 
-        return (
-            f"{indentation}connection {{\n"
-            f"{body}\n"
-            f"{indentation}}}"
-        )
+        return f"{indentation}connection {{\n{body}\n{indentation}}}"
 
     def _render_nested_block(
         self,
@@ -514,11 +473,7 @@ class TerraformGenerator:
             level=level + 1,
         )
 
-        return (
-            f"{indentation}{name} {{\n"
-            f"{body}\n"
-            f"{indentation}}}"
-        )
+        return f"{indentation}{name} {{\n{body}\n{indentation}}}"
 
     def _render_value(
         self,
@@ -551,12 +506,8 @@ class TerraformGenerator:
             # Function arguments can be literals (which need quoting), typed
             # references, or nested expressions. Let each argument's type
             # determine its rendering rather than forcing expression mode.
-            arguments = ", ".join(
-                self._render_value(argument)
-                for argument in value.arguments
-            )
+            arguments = ", ".join(self._render_value(argument) for argument in value.arguments)
             return f"{value.name}({arguments})"
-        
 
         if isinstance(value, ConditionalExpression):
             condition = self._render_value(value.condition, expression=True)
@@ -597,9 +548,7 @@ class TerraformGenerator:
             else:
                 iterator = value.variable
 
-            expression_text = (
-                f"for {iterator} in {collection} : {result}"
-            )
+            expression_text = f"for {iterator} in {collection} : {result}"
 
             if value.condition is not None:
                 condition = self._render_value(
@@ -627,9 +576,7 @@ class TerraformGenerator:
                         "Map CollectionExpression items must be key/value pairs"
                     ) from exc
                 return self._render_object(mapping)
-            raise TerraformGenerationError(
-                f"Unsupported collection kind: {value.kind}"
-            )
+            raise TerraformGenerationError(f"Unsupported collection kind: {value.kind}")
 
         if isinstance(value, dict):
             return self._render_object(value)
@@ -681,9 +628,7 @@ class TerraformGenerator:
                 expression=expression,
             )
 
-        raise TerraformGenerationError(
-            f"Unsupported literal type: {type(value).__name__}"
-        )
+        raise TerraformGenerationError(f"Unsupported literal type: {type(value).__name__}")
 
     def _render_object(
         self,
@@ -697,10 +642,7 @@ class TerraformGenerator:
         for key, item in value.items():
             rendered = self._render_value(item)
 
-            lines.append(
-                f"{self._indent(1)}"
-                f"{self._render_key(key)} = {rendered}"
-            )
+            lines.append(f"{self._indent(1)}{self._render_key(key)} = {rendered}")
 
         lines.append("}")
 
@@ -729,11 +671,7 @@ class TerraformGenerator:
         self,
         key: str,
     ) -> str:
-        if (
-            key
-            and key.replace("_", "a").isalnum()
-            and not key[0].isdigit()
-        ):
+        if key and key.replace("_", "a").isalnum() and not key[0].isdigit():
             return key
 
         return json.dumps(key)
@@ -754,11 +692,7 @@ class TerraformGenerator:
             level,
         )
 
-        return (
-            f"{indentation}{header} {{\n"
-            f"{body}\n"
-            f"{indentation}}}"
-        )
+        return f"{indentation}{header} {{\n{body}\n{indentation}}}"
 
     def _indent_block(
         self,
@@ -767,10 +701,7 @@ class TerraformGenerator:
     ) -> str:
         prefix = self._indent(level)
 
-        return "\n".join(
-            prefix + line
-            for line in value.splitlines()
-        )
+        return "\n".join(prefix + line for line in value.splitlines())
 
     def _indent(
         self,

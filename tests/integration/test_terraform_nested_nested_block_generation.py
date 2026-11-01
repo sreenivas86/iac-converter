@@ -1,5 +1,5 @@
-from iac_converter.ir import Block, Literal, ProjectIR, Resource
 from iac_converter.generator.terraform import generate_terraform
+from iac_converter.ir import Block, Literal, ProjectIR, Resource
 
 
 def test_generate_terraform_nested_nested_blocks():

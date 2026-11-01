@@ -1,5 +1,6 @@
 from iac_converter.compiler.terraform_to_ir import parse_terraform
 from iac_converter.generator.terraform import generate_terraform
+from iac_converter.generator.yaml import generate_yaml
 from iac_converter.ir import (
     ConditionalExpression,
     DataSourceReference,
@@ -10,8 +11,6 @@ from iac_converter.ir import (
     VariableReference,
 )
 from iac_converter.parser.yaml_parser import parse_yaml
-from iac_converter.generator.yaml import generate_yaml
-from iac_converter.compiler.terraform_to_ir import parse_terraform
 
 
 def test_yaml_terraform_round_trip_preserves_nested_block() -> None:
@@ -342,7 +341,6 @@ output "bucket_name" {
     assert expression.false_value.value == "disabled"
 
 
-
 def test_terraform_yaml_round_trip_preserves_nested_blocks() -> None:
     terraform_source = """
 resource "example" "test" {
@@ -379,6 +377,7 @@ resource "example" "test" {
 
     assert inner.type == "inner"
     assert inner.attributes["enabled"].value is True
+
 
 def test_terraform_yaml_round_trip_preserves_nested_block_labels() -> None:
     terraform_source = """

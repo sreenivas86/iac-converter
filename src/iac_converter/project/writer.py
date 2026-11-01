@@ -23,14 +23,10 @@ def save_project(project: Project, path: str | Path) -> None:
     try:
         root.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise ProjectWriteError(
-            f"Failed to create project directory '{root}': {exc}"
-        ) from exc
+        raise ProjectWriteError(f"Failed to create project directory '{root}': {exc}") from exc
 
     if not root.is_dir():
-        raise ProjectWriteError(
-            f"Project path is not a directory: {root}"
-        )
+        raise ProjectWriteError(f"Project path is not a directory: {root}")
 
     seen_paths: set[str] = set()
 
@@ -38,23 +34,17 @@ def save_project(project: Project, path: str | Path) -> None:
         relative_path = project_file.path.replace("\\", "/")
 
         if not relative_path:
-            raise ProjectWriteError(
-                "Project file path cannot be empty."
-            )
+            raise ProjectWriteError("Project file path cannot be empty.")
 
         if relative_path in seen_paths:
-            raise ProjectWriteError(
-                f"Duplicate project file path: {relative_path}"
-            )
+            raise ProjectWriteError(f"Duplicate project file path: {relative_path}")
 
         seen_paths.add(relative_path)
 
         relative = Path(relative_path)
 
         if relative.is_absolute():
-            raise ProjectWriteError(
-                f"Project file path must be relative: {project_file.path}"
-            )
+            raise ProjectWriteError(f"Project file path must be relative: {project_file.path}")
 
         target = (root / relative).resolve()
 
@@ -62,8 +52,7 @@ def save_project(project: Project, path: str | Path) -> None:
             target.relative_to(root.resolve())
         except ValueError as exc:
             raise ProjectWriteError(
-                f"Project file path escapes project directory: "
-                f"{project_file.path}"
+                f"Project file path escapes project directory: {project_file.path}"
             ) from exc
 
         try:

@@ -1,10 +1,9 @@
-
 from iac_converter.compiler import (
     parse_terraform_project,
     parse_yaml_project,
 )
 from iac_converter.generator import generate_terraform
-from iac_converter.ir import Literal,CollectionExpression
+from iac_converter.ir import CollectionExpression, Literal
 from iac_converter.project import Project, ProjectFile
 
 
@@ -40,24 +39,18 @@ resources:
 
     original_resource = original_ir.resources[0]
 
-    assert (
-        original_resource.lifecycle["prevent_destroy"]
-        == Literal(True)
-    )
+    assert original_resource.lifecycle["prevent_destroy"] == Literal(True)
 
-    assert (
-        original_resource.lifecycle["create_before_destroy"]
-        == Literal(True)
-    )
+    assert original_resource.lifecycle["create_before_destroy"] == Literal(True)
 
     ignore_changes = original_resource.lifecycle["ignore_changes"]
 
     assert isinstance(ignore_changes, CollectionExpression)
     assert ignore_changes.kind == "list"
     assert ignore_changes.items == (
-    Literal("tags"),
-    Literal("bucket"),
-)
+        Literal("tags"),
+        Literal("bucket"),
+    )
 
     # ---------------------------------------------------------
     # ProjectIR -> Terraform
@@ -94,15 +87,9 @@ resources:
     round_trip_resource = round_trip_ir.resources[0]
 
     # Lifecycle booleans
-    assert (
-        round_trip_resource.lifecycle["prevent_destroy"]
-        == Literal(True)
-    )
+    assert round_trip_resource.lifecycle["prevent_destroy"] == Literal(True)
 
-    assert (
-        round_trip_resource.lifecycle["create_before_destroy"]
-        == Literal(True)
-    )
+    assert round_trip_resource.lifecycle["create_before_destroy"] == Literal(True)
 
     # ignore_changes
     assert round_trip_resource.lifecycle["ignore_changes"] == [

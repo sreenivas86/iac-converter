@@ -1,4 +1,3 @@
-
 from iac_converter.compiler import parse_terraform_project
 from iac_converter.ir import Literal
 from iac_converter.project import Project, ProjectFile
@@ -50,9 +49,7 @@ resource "aws_security_group" "example" {
     assert first.attributes["from_port"] == Literal(80)
     assert first.attributes["to_port"] == Literal(80)
     assert first.attributes["protocol"] == Literal("tcp")
-    assert first.attributes["cidr_blocks"] == [
-        Literal("0.0.0.0/0")
-    ]
+    assert first.attributes["cidr_blocks"] == [Literal("0.0.0.0/0")]
 
     second = resource.blocks[1]
 
@@ -60,7 +57,4 @@ resource "aws_security_group" "example" {
     assert second.attributes["from_port"] == Literal(443)
     assert second.attributes["to_port"] == Literal(443)
     assert second.attributes["protocol"] == Literal("tcp")
-    assert second.attributes["cidr_blocks"] == [
-        Literal("0.0.0.0/0")
-    ]
-
+    assert second.attributes["cidr_blocks"] == [Literal("0.0.0.0/0")]

@@ -133,9 +133,7 @@ def _parse_provisioners(
         properties = provisioner.get("properties", {})
 
         if not isinstance(properties, dict):
-            raise YAMLParseError(
-                "Provisioner 'properties' must be an object"
-            )
+            raise YAMLParseError("Provisioner 'properties' must be an object")
 
         converted_provisioner: dict[str, Any] = {
             "type": provisioner_type,
@@ -146,13 +144,9 @@ def _parse_provisioners(
 
         if connection is not None:
             if not isinstance(connection, dict):
-                raise YAMLParseError(
-                    "Provisioner 'connection' must be an object"
-                )
+                raise YAMLParseError("Provisioner 'connection' must be an object")
 
-            converted_provisioner["connection"] = _convert_mapping(
-                connection
-            )
+            converted_provisioner["connection"] = _convert_mapping(connection)
 
         converted.append(converted_provisioner)
 
@@ -184,10 +178,7 @@ def _parse_outputs(project: YAMLProject) -> list[Output]:
 
 def _convert_mapping(value: dict[str, Any]) -> dict[str, Any]:
     """Preserve structural mappings while converting their values."""
-    return {
-        key: _convert_value(item)
-        for key, item in value.items()
-    }
+    return {key: _convert_value(item) for key, item in value.items()}
 
 
 def _convert_value(value: Any) -> Any:
@@ -218,10 +209,7 @@ def _convert_value(value: Any) -> Any:
 
         return CollectionExpression(
             kind="map",
-            items=tuple(
-                (key, _convert_value(item))
-                for key, item in value.items()
-            ),
+            items=tuple((key, _convert_value(item)) for key, item in value.items()),
         )
 
     if isinstance(value, list):

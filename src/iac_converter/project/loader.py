@@ -25,26 +25,16 @@ def load_project(path: str | Path) -> Project:
     root = Path(path).expanduser()
 
     if not root.exists():
-        raise ProjectLoadError(
-            f"Project path does not exist: {root}"
-        )
+        raise ProjectLoadError(f"Project path does not exist: {root}")
 
     if not root.is_dir():
-        raise ProjectLoadError(
-            f"Project path is not a directory: {root}"
-        )
+        raise ProjectLoadError(f"Project path is not a directory: {root}")
 
     files: list[ProjectFile] = []
 
-    file_paths = [
-        file_path
-        for file_path in root.rglob("*")
-        if file_path.is_file()
-    ]
+    file_paths = [file_path for file_path in root.rglob("*") if file_path.is_file()]
 
-    file_paths.sort(
-        key=lambda file_path: file_path.relative_to(root).as_posix()
-    )
+    file_paths.sort(key=lambda file_path: file_path.relative_to(root).as_posix())
 
     for file_path in file_paths:
         relative_path = file_path.relative_to(root).as_posix()
@@ -52,13 +42,9 @@ def load_project(path: str | Path) -> Project:
         try:
             content = file_path.read_text(encoding="utf-8")
         except UnicodeDecodeError as exc:
-            raise ProjectLoadError(
-                f"Project file is not valid UTF-8: {relative_path}"
-            ) from exc
+            raise ProjectLoadError(f"Project file is not valid UTF-8: {relative_path}") from exc
         except OSError as exc:
-            raise ProjectLoadError(
-                f"Failed to read project file '{relative_path}': {exc}"
-            ) from exc
+            raise ProjectLoadError(f"Failed to read project file '{relative_path}': {exc}") from exc
 
         files.append(
             ProjectFile(

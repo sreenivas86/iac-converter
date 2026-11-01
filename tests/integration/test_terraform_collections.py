@@ -55,6 +55,7 @@ output "names" {
     assert expression.kind == "list"
     assert expression.items == (Literal("alpha"), Literal("beta"))
 
+
 def test_terraform_tuple_values_survive_generation_and_reparsing() -> None:
     source = """
 output "coordinates" {

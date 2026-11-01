@@ -33,9 +33,7 @@ def test_save_project_writes_files(tmp_path: Path) -> None:
         'resource "aws_s3_bucket" "data" {}\n'
     )
 
-    assert (output / "variables.tf").read_text(encoding="utf-8") == (
-        'variable "bucket_name" {}\n'
-    )
+    assert (output / "variables.tf").read_text(encoding="utf-8") == ('variable "bucket_name" {}\n')
 
 
 def test_save_project_creates_nested_directories(tmp_path: Path) -> None:
@@ -52,9 +50,7 @@ def test_save_project_creates_nested_directories(tmp_path: Path) -> None:
 
     save_project(project, output)
 
-    assert (
-        output / "modules" / "storage" / "main.tf"
-    ).read_text(encoding="utf-8") == (
+    assert (output / "modules" / "storage" / "main.tf").read_text(encoding="utf-8") == (
         'resource "aws_s3_bucket" "data" {}\n'
     )
 
@@ -91,9 +87,7 @@ def test_save_project_preserves_utf8_content(tmp_path: Path) -> None:
 
     save_project(project, output)
 
-    assert (output / "README.md").read_text(encoding="utf-8") == (
-        "# S3 配置 — café\n"
-    )
+    assert (output / "README.md").read_text(encoding="utf-8") == ("# S3 配置 — café\n")
 
 
 def test_save_project_accepts_windows_style_relative_paths(
@@ -112,9 +106,9 @@ def test_save_project_accepts_windows_style_relative_paths(
 
     save_project(project, output)
 
-    assert (
-        output / "modules" / "storage" / "main.tf"
-    ).read_text(encoding="utf-8") == "# Terraform\n"
+    assert (output / "modules" / "storage" / "main.tf").read_text(
+        encoding="utf-8"
+    ) == "# Terraform\n"
 
 
 def test_save_project_rejects_absolute_path(tmp_path: Path) -> None:
@@ -209,10 +203,6 @@ def test_save_project_round_trip(tmp_path: Path) -> None:
 
     loaded = load_project(output)
 
-    assert {
-        project_file.path: project_file.content
-        for project_file in loaded.files
-    } == {
-        project_file.path: project_file.content
-        for project_file in project.files
+    assert {project_file.path: project_file.content for project_file in loaded.files} == {
+        project_file.path: project_file.content for project_file in project.files
     }

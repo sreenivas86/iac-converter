@@ -61,12 +61,9 @@ def test_generate_terraform_project_creates_expected_files() -> None:
         "outputs.tf",
     ]
 
-    contents = {
-        project_file.path: project_file.content
-        for project_file in result.files
-    }
+    contents = {project_file.path: project_file.content for project_file in result.files}
 
-    assert 'terraform {' in contents["terraform.tf"]
+    assert "terraform {" in contents["terraform.tf"]
     assert 'required_version = ">= 1.6.0"' in contents["terraform.tf"]
 
     assert 'provider "aws" {' in contents["providers.tf"]

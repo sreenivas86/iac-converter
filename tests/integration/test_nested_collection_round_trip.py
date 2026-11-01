@@ -34,6 +34,7 @@ output "matrix" {
     assert first_inner.items == (Literal("alpha"), Literal("beta"))
     assert second_inner.items == (Literal("gamma"),)
 
+
 def test_map_with_nested_list_round_trip_preserves_structure():
     source = """
 output "settings" {
@@ -77,6 +78,7 @@ output "names" {
     assert isinstance(expression, CollectionExpression)
     assert len(expression.items) == 2
     assert "var.bucket_name" in generated
+
 
 def test_nested_map_with_mixed_expressions_round_trip():
     source = """

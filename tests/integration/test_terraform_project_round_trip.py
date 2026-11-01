@@ -72,10 +72,7 @@ output "bucket_id" {
 
     generated_project = load_project(output)
 
-    generated_paths = {
-        project_file.path
-        for project_file in generated_project.files
-    }
+    generated_paths = {project_file.path for project_file in generated_project.files}
 
     assert generated_paths == {
         "terraform.tf",
@@ -86,34 +83,19 @@ output "bucket_id" {
     }
 
     generated_contents = {
-        project_file.path: project_file.content
-        for project_file in generated_project.files
+        project_file.path: project_file.content for project_file in generated_project.files
     }
 
-    assert 'required_version = ">= 1.6.0"' in generated_contents[
-        "terraform.tf"
-    ]
+    assert 'required_version = ">= 1.6.0"' in generated_contents["terraform.tf"]
 
-    assert 'provider "aws"' in generated_contents[
-        "providers.tf"
-    ]
+    assert 'provider "aws"' in generated_contents["providers.tf"]
 
-    assert 'variable "bucket_name"' in generated_contents[
-        "variables.tf"
-    ]
+    assert 'variable "bucket_name"' in generated_contents["variables.tf"]
 
-    assert 'resource "aws_s3_bucket" "data"' in generated_contents[
-        "main.tf"
-    ]
+    assert 'resource "aws_s3_bucket" "data"' in generated_contents["main.tf"]
 
-    assert "bucket = var.bucket_name" in generated_contents[
-        "main.tf"
-    ]
+    assert "bucket = var.bucket_name" in generated_contents["main.tf"]
 
-    assert 'output "bucket_id"' in generated_contents[
-        "outputs.tf"
-    ]
+    assert 'output "bucket_id"' in generated_contents["outputs.tf"]
 
-    assert "value = aws_s3_bucket.data.id" in generated_contents[
-        "outputs.tf"
-    ]
+    assert "value = aws_s3_bucket.data.id" in generated_contents["outputs.tf"]

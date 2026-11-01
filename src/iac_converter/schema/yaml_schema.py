@@ -1,7 +1,6 @@
-
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class YAMLProvider(BaseModel):
@@ -15,6 +14,14 @@ class YAMLBlock(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: str
+
+    @field_validator("type")
+    @classmethod
+    def validate_non_empty_strings(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Value must not be empty or whitespace")
+        return value
+
     labels: list[str] = Field(default_factory=list)
     properties: dict[str, Any] = Field(default_factory=dict)
     blocks: list["YAMLBlock"] = Field(default_factory=list)
@@ -23,8 +30,16 @@ class YAMLBlock(BaseModel):
 class YAMLResource(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: str
-    name: str
+    type: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+
+    @field_validator("type", "name")
+    @classmethod
+    def validate_non_empty_strings(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Value must not be empty or whitespace")
+        return value
+
     properties: dict[str, Any] = Field(default_factory=dict)
     blocks: list[YAMLBlock] = Field(default_factory=list)
     count: Any | None = None
@@ -37,7 +52,15 @@ class YAMLResource(BaseModel):
 class YAMLVariable(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str
+    name: str = Field(min_length=1)
+
+    @field_validator("name")
+    @classmethod
+    def validate_non_empty_strings(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Value must not be empty or whitespace")
+        return value
+
     type: Any | None = None
     description: str | None = None
     default: Any | None = None
@@ -50,13 +73,29 @@ class YAMLDataSource(BaseModel):
 
     type: str
     name: str
+
+    @field_validator("type", "name")
+    @classmethod
+    def validate_non_empty_strings(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Value must not be empty or whitespace")
+        return value
+
     properties: dict[str, Any] = Field(default_factory=dict)
 
 
 class YAMLOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str
+    name: str = Field(min_length=1)
+
+    @field_validator("name")
+    @classmethod
+    def validate_non_empty_strings(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Value must not be empty or whitespace")
+        return value
+
     value: Any
     description: str | None = None
     sensitive: bool = False
@@ -79,4 +118,3 @@ class YAMLProject(BaseModel):
     outputs: list[YAMLOutput] = Field(default_factory=list)
 
     locals: dict[str, Any] = Field(default_factory=dict)
-

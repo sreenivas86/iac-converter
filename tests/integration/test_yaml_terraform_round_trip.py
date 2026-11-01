@@ -1,4 +1,3 @@
-
 from iac_converter.compiler import (
     parse_terraform_project,
     parse_yaml_project,
@@ -6,7 +5,6 @@ from iac_converter.compiler import (
 from iac_converter.generator import generate_terraform
 from iac_converter.generator.yaml import generate_yaml
 from iac_converter.project import Project, ProjectFile
-
 
 
 def test_yaml_to_terraform_to_ir_round_trip() -> None:
@@ -127,15 +125,9 @@ outputs:
 
     assert round_trip_variable.name == original_variable.name
 
-    assert (
-        round_trip_variable.description
-        == original_variable.description
-    )
+    assert round_trip_variable.description == original_variable.description
 
-    assert (
-        round_trip_variable.default
-        == original_variable.default
-    )
+    assert round_trip_variable.default == original_variable.default
 
     # ---------------------------------------------------------
     # Resource
@@ -162,10 +154,7 @@ outputs:
     # bucket = var.bucket_name
     # ---------------------------------------------------------
 
-    assert (
-        round_trip_resource.attributes["bucket"]
-        == original_resource.attributes["bucket"]
-    )
+    assert round_trip_resource.attributes["bucket"] == original_resource.attributes["bucket"]
 
     # ---------------------------------------------------------
     # Resource nested map
@@ -196,16 +185,14 @@ outputs:
     assert round_trip_output.value == original_output.value
 
 
-
 def test_nested_expressions_survive_yaml_terraform_round_trip() -> None:
-    
+
     from iac_converter.ir import (
-    CollectionExpression,
-    Literal,
-    RawExpression,
-    Reference,
-)
-    
+        CollectionExpression,
+        Literal,
+        RawExpression,
+        Reference,
+    )
 
     yaml_source = """
 resources:
@@ -232,7 +219,6 @@ outputs:
 
     original_ir = parse_yaml_project(yaml_source)
     terraform_source = generate_terraform(original_ir)
-    
 
     terraform_project = Project(
         files=[
@@ -274,7 +260,7 @@ outputs:
         Literal("ap-south-1"),
         Literal("ap-southeast-1"),
     ]
-        # Terraform IR -> YAML -> IR
+    # Terraform IR -> YAML -> IR
     yaml_after_round_trip = generate_yaml(round_trip_ir)
     yaml_reparsed_ir = parse_yaml_project(yaml_after_round_trip)
 

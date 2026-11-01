@@ -1,182 +1,278 @@
-# IaC Converter — Project Progress Report
+IaC Converter – Updated Project Roadmap
+Core conversion implemented
+166 tests passing
 
-Based on our work together and the test results you ran through October 29, 2026.
+Your project has progressed from a single-file YAML/Terraform converter into a project-level, bidirectional conversion tool with ZIP support and a FastAPI interface.
 
-## 1. Executive summary
+Below is the consolidated roadmap, including completed work, work in progress, and what remains.
+1. Overall project roadmap
+Milestone	Description	Status
+M1	Single-file YAML ↔ Terraform conversion	Complete
+M2	Project-level conversion	Complete
+M2.2	Directory loading and project handling	Complete
+M3	Advanced Terraform language support	Complete
+M4	YAML schema validation	Complete
+M5	FastAPI and ZIP-to-ZIP conversion	Implemented; hardening pending
+M6	Project storage and persistence	Audit pending
+M7	Terraform execution and validation	Audit pending
+M8	End-to-end testing and documentation	Pending
+M9	Deployment and production readiness	Pending
 
-The IaC Converter has a working foundation for converting Terraform and YAML, handling projects containing multiple files, and preserving increasingly complex Terraform expressions. The latest full test run reported 133 passed, 0 failed in 1.53 seconds.
 
-The main priority now is to audit the remaining milestones, confirm what is implemented and tested, and fill any verified gaps—not rebuild components that already exist.
+2. Completed milestones
+M1 – Single-file conversion
+Complete
+Implemented:
+- YAML to Terraform conversion.
+- Terraform to YAML conversion.
+- Intermediate Representation (IR).
+- YAML parser.
+- Terraform parser.
+- Terraform generator.
+- YAML generator.
+- Basic round-trip conversion.
+M2 – Project-level conversion
+Complete
+Implemented:
+- Terraform project parsing.
+- YAML project parsing.
+- Project-level IR.
+- Multi-file Terraform generation.
+- Canonical YAML project generation.
+- Project-level round-trip testing.
+M2.2 – Directory handling
+Complete
+Implemented:
+- Recursive project directory loading.
+- Nested directory support.
+- Relative project file paths.
+- UTF-8 file handling.
+- Cross-platform path handling.
+M3 – Advanced Terraform support
+Complete
+Implemented and tested:
+- Nested blocks.
+- Nested collections.
+- Lists and maps.
+- Typed collections.
+- Resource lifecycle rules.
+- Meta-arguments.
+- Provisioners.
+- Connection blocks.
+- Data sources.
+- Locals.
+- Complex expressions.
+- Filtered map comprehensions.
+M4 – Schema validation
+Complete
+Implemented:
+- Pydantic-based YAML schema models.
+- Resource validation.
+- Variable validation.
+- Output validation.
+- Provider validation.
+- Data source validation.
+- Block validation.
+- Unknown-field rejection.
+- Empty identifier validation.
 
-Full test suite
+3. M5 – API and ZIP conversion
+Core implementation complete; hardening pending
+What we have completed
+FastAPI implementation
+- Health endpoint.
+- YAML-to-Terraform endpoint.
+- Terraform-to-YAML endpoint.
+- YAML ZIP-to-Terraform ZIP endpoint.
+- Terraform ZIP-to-YAML ZIP endpoint.
+ZIP functionality
+- ZIP archive loading.
+- ZIP archive saving.
+- Nested project files.
+- Duplicate path protection.
+- Path traversal protection.
+- Invalid archive handling.
+- UTF-8 validation.
+- Maximum 1,000 files.
+- Maximum 10 MB per file.
+- Maximum 100 MB total uncompressed content.
+API integration tests
+- Health endpoint.
+- YAML-to-Terraform.
+- Terraform-to-YAML.
+- Invalid YAML.
+- Invalid Terraform ZIP.
+- YAML ZIP-to-Terraform ZIP.
+- Terraform ZIP-to-YAML ZIP.
+What remains in M5
+Task	Status
+Request-level upload size enforcement	Pending
+ZIP decompression security review	Pending
+Duplicate YAML resource/variable conflict handling	Pending
+API error-handling test coverage	Pending
+Dependency declaration audit	Pending
+API documentation	Pending
+API performance and concurrency testing	Pending
 
-# 133 passed
+One important distinction: the current endpoint reads at most 100 MB plus one byte, but multipart parsing may already have received and spooled the upload. We should enforce a request-level limit as well.
 
-Latest user-reported run; 1.53 seconds
-
-Conversion and project handling
-
-Implemented and covered by passing tests for the cases verified so far.
-
-Remaining milestones
-
-Schema validation, API, storage, and execution need a fuller implementation and test audit.
-
-## 2. What we have completed
-
-### M1 — Single-file conversion
-
-Marked complete
-
-- Established the single-file conversion foundation.
-- Terraform and YAML parsing and generation modules exist.
-- Conversion and round-trip behavior has test coverage.
-
-The milestone was previously marked complete in our project tracking; this session did not re-audit every single-file scenario.
-
-### M2 — Project conversion
-
-Marked complete
-
-- Project-level Terraform and YAML compiler/generator modules exist.
-- Multi-file project conversion and round-trip tests exist.
-- Project conversion tests passed during previous verification.
-
-### M2.2 — Directory loading
-
-Verified by targeted tests
-
-The following nine tests passed:
-
-| Test area                                          | Result |
-| -------------------------------------------------- | ------ |
-| Recursive file loading                             | Passed |
-| Preserving file contents                           | Passed |
-| Empty directories                                  | Passed |
-| Rejecting missing paths                            | Passed |
-| Rejecting file paths where a directory is expected | Passed |
-| Accepting string paths                             | Passed |
-| Normalizing nested paths                           | Passed |
-| Terraform project round trip                       | Passed |
-| Terraform-to-YAML project conversion               | Passed |
-
-Result: 9 passed in 0.70 seconds.
-
-### M3 — Advanced Terraform expression support
-
-Progress verified
-
-The implementation and tests cover these expression types:
-
-Nested collections
-
-Nested maps and lists, including references inside collections.
-
-Function calls
-
-Nested calls and calls with collection arguments.
-
-Conditional expressions
-
-Nested conditionals and conditionals inside function calls.
-
-Splat expressions
-
-Round-trip test coverage exists.
-
-List comprehensions
-
-Basic and filtered list-comprehension tests.
-
-Map comprehensions
-
-Basic map comprehensions plus grouped, filtered map-comprehension round-trip coverage.
-
-Recent improvements included fixing the map-comprehension `=>` parsing issue, handling grouping syntax, and adding regression assertions that grouping, filtering, key, and value survive reparsing.
-
-The focused grouped-map test passed, followed by the full suite: 133 passed.
-
-Important scope note: this verifies the tested expression cases, not complete compatibility with every Terraform expression or language feature.
-
-## 3. What remains to do
-
-The following milestones have not yet been fully audited. Existing source modules confirm that code is present, but their existence alone does not prove that all required behavior works.
-
-M4 — Schema validation
-
-Audit next
-
-Existing modules: `schema/provider_schema.py`, `schema/yaml_schema.py`
-
-- Inspect supported schemas and validation rules.
-- Verify valid inputs are accepted and invalid inputs produce useful errors.
-- Check malformed YAML, missing required fields, and type mismatches.
-- Confirm validation errors are surfaced consistently through conversion paths.
-
-M5 — API
-
+4. M6 – Storage and persistence
 Audit pending
+We already have project storage-related modules:
+- project/archive.py
+- project/loader.py
+- project/writer.py
+- project/project.py
+Remaining work
+1. Audit project directory loading.
+2. Audit project directory writing.
+3. Verify ZIP persistence.
+4. Verify nested directory preservation.
+5. Test duplicate file handling.
+6. Test invalid paths.
+7. Test large project handling.
+8. Review storage error handling.
+9. Add missing integration tests.
+Goal: Reliable project storage and retrieval without losing files or changing directory structures unexpectedly.
 
-Existing module: `api/app.py`
+5. M7 – Terraform execution and validation
+Audit pending
+This milestone needs an inspection of your existing code before deciding what is already implemented.
+Planned work
+1. Audit Terraform execution support.
+2. Check Terraform CLI availability.
+3. Implement or verify terraform fmt.
+4. Implement or verify terraform validate.
+5. Implement or verify terraform init.
+6. Capture execution output.
+7. Handle execution timeouts.
+8. Handle Terraform errors.
+9. Prevent unsafe execution paths.
+10. Add execution tests.
+Important: Terraform execution should be an explicit, controlled operation. Uploading a ZIP for conversion must never automatically execute Terraform.
 
-- Identify available endpoints and request/response formats.
-- Test successful conversion requests.
-- Test invalid input, validation errors, and unsupported conversions.
-- Check HTTP status codes and error responses.
-- Verify API tests and documentation.
+6. M8 – Testing and documentation
+Pending
+Testing
+- Full unit test suite.
+- Full integration test suite.
+- ZIP conversion round trips.
+- Large archive tests.
+- Invalid input tests.
+- API security tests.
+- Performance tests.
+- Cross-platform tests.
+Documentation
+- Project README.
+- Installation guide.
+- Python environment setup.
+- API documentation.
+- YAML schema documentation.
+- Supported Terraform features.
+- Conversion examples.
+- ZIP upload instructions.
+- Error handling guide.
+- Limitations and unsupported features.
+Example workflow
+Document the complete workflow:
+YAML files
+    |
+    v
+Create YAML ZIP
+    |
+    v
+Upload to API
+    |
+    v
+YAML ZIP → Terraform ZIP
+    |
+    v
+Download Terraform ZIP
+    |
+    v
+Review generated Terraform
+    |
+    v
+Run Terraform validation
 
-M6 — Storage and project persistence
 
-Partially verified
 
-Existing modules: `project/archive.py`, `project/loader.py`, `project/writer.py`, `project/project.py`
+7. M9 – Deployment and production readiness
+Pending
+Planned work:
+- Docker support.
+- Environment configuration.
+- Production ASGI server configuration.
+- Logging.
+- Health monitoring.
+- Request limits.
+- Authentication, if exposed beyond a trusted environment.
+- Rate limiting.
+- Error monitoring.
+- CI/CD pipeline.
+- Automated tests in CI.
+- Release versioning.
+- Deployment documentation.
 
-- Review archive creation and extraction behavior.
-- Verify writing projects preserves directory structure and file contents.
-- Check invalid archives, path traversal protections, and error handling.
-- Determine whether persistent storage is required beyond filesystem and archive handling.
+8. Current test progress
+Latest full test run
+All passing
 
-M7 — Execution and orchestration
+166 / 166
 
-Unclear scope
 
-No obviously named execution module appeared in the source listing.
+API integration tests
 
-- Establish what “execution” means for this project.
-- Search for existing orchestration, subprocess, CLI, or workflow code.
-- If execution means running Terraform commands, verify command handling, timeouts, exit codes, and safety boundaries.
-- Implement only the missing functionality that the project requirements actually call for.
+7 passed
 
-## 4. Repository and quality follow-ups
+Archive unit tests
 
-These are additional checks, separate from the milestone work.
+11 passed
 
-- Modified bytecode files: Git status showed four modified files under `__pycache__`. Inspect why generated files are tracked or changing, and check ignore rules. Do not remove or revert them until their repository status is understood.
-- Working-tree preservation: Several source and test files are intentionally modified. Keep those changes intact.
-- Regression coverage: Continue adding focused tests for each verified bug or missing behavior, then run the full suite.
-- Documentation: Review `f.md` and `plan-documents/` as appropriate to reconcile the actual implementation with the intended roadmap. Preserve these files and other unrelated work.
-- Release readiness: Once M4–M7 are audited, run linting, type checks, packaging/build checks, and any configured coverage checks.
+Schema unit tests
 
-## 5. Recommended execution plan
+22 passed
 
-1. Audit test inventory. List test files and map them to M4–M7.
-2. Verify M4. Run schema-validation tests and inspect missing positive and negative cases.
-3. Verify M5. Inspect `api/app.py`, identify the API framework and endpoints, then run relevant API tests.
-4. Verify M6. Run archive, loader, and writer tests; inspect safety and persistence requirements.
-5. Clarify and verify M7. Establish the intended execution scope before adding modules.
-6. Final quality gate. Run the full test suite and project checks, review the final Git status, and update the roadmap based on evidence.
+Full suite duration
 
-## 6. Current status at a glance
+1.74 seconds
 
-| Milestone                       | Current assessment                                                    |
-| ------------------------------- | --------------------------------------------------------------------- |
-| M1 — Single-file conversion     | Marked complete                                                       |
-| M2 — Project conversion         | Marked complete                                                       |
-| M2.2 — Directory loading        | Verified by 9 targeted passing tests                                  |
-| M3 — Advanced Terraform support | Key expression cases verified; broader compatibility remains to audit |
-| M4 — Schema validation          | Existing modules; audit pending                                       |
-| M5 — API                        | Existing module; audit pending                                        |
-| M6 — Storage                    | Project filesystem/archive functionality exists; audit pending        |
-| M7 — Execution                  | Scope and implementation need investigation                           |
 
-Bottom line: The strongest verified result is the passing 133-test suite, including the recent comprehension fixes and regression coverage. The next priority is M4 schema validation, followed by the API and storage audits. M7 should be defined from your project requirements before implementation begins.
+
+The latest confirmed full test result is 166 passed. This is a test result, not yet a production-readiness certification.
+
+9. Immediate next steps
+I recommend following this exact order:
+1. M5.1 – API upload security
+   
+   Enforce request-level upload limits and review ZIP decompression protections.
+2. M5.2 – YAML ZIP conflict handling
+   
+   Detect duplicate resource names, variables, providers, and outputs across YAML documents.
+3. M5.3 – API error handling
+   
+   Add tests for invalid YAML ZIPs, missing YAML files, wrong extensions, oversized uploads, and invalid Terraform projects.
+4. M5.4 – Dependency audit
+   
+   Verify pyproject.toml and development dependencies so a fresh environment can install and run the tests.
+5. M6 – Storage audit
+   
+   Inspect existing implementation and fill any gaps.
+6. M7 – Terraform execution audit
+   
+   Verify existing capabilities before adding new functionality.
+7. M8 and M9
+   
+   Complete documentation, deployment, and production hardening.
+10. Project working rules
+We'll continue using the same approach:
+- One task at a time.
+- Exact Windows PowerShell commands.
+- Inspect existing code before modifying it.
+- Preserve your current uncommitted changes.
+- Run targeted tests after each change.
+- Run the complete suite after each milestone.
+- Mark milestones complete only after verification.
+Our next task is M5.1: request-level upload security.
+
+This is the best next step because your two ZIP conversion endpoints are working, and we should secure their upload handling before expanding the API further.

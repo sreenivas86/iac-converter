@@ -1,4 +1,3 @@
-
 from iac_converter.compiler.terraform_to_ir import parse_terraform
 from iac_converter.ir import (
     CollectionExpression,

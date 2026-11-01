@@ -43,12 +43,8 @@ resources:
 
     assert provisioner["connection"]["type"] == Literal("ssh")
     assert provisioner["connection"]["user"] == Literal("ubuntu")
-    assert provisioner["connection"]["private_key"] == RawExpression(
-        'file("~/.ssh/id_rsa")'
-    )
-    assert provisioner["connection"]["host"] == RawExpression(
-        "self.public_ip"
-    )
+    assert provisioner["connection"]["private_key"] == RawExpression('file("~/.ssh/id_rsa")')
+    assert provisioner["connection"]["host"] == RawExpression("self.public_ip")
 
     # ProjectIR -> Terraform
     terraform_source = generate_terraform(original_ir)
@@ -82,9 +78,5 @@ resources:
 
     assert connection["type"] == Literal("ssh")
     assert connection["user"] == Literal("ubuntu")
-    assert connection["private_key"] == RawExpression(
-        'file("~/.ssh/id_rsa")'
-    )
-    assert connection["host"] == RawExpression(
-        "self.public_ip"
-    )
+    assert connection["private_key"] == RawExpression('file("~/.ssh/id_rsa")')
+    assert connection["host"] == RawExpression("self.public_ip")

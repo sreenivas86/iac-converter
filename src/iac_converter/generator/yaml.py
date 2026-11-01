@@ -33,43 +33,31 @@ class YAMLGenerator:
         document["version"] = str(project.version)
 
         if project.terraform:
-            document["terraform"] = self._convert_value(
-                project.terraform
-            )
+            document["terraform"] = self._convert_value(project.terraform)
 
         if project.providers:
-            document["providers"] = self._generate_providers(
-                project.providers
-            )
+            document["providers"] = self._generate_providers(project.providers)
 
         if project.variables:
             document["variables"] = [
-                self._generate_variable(variable)
-                for variable in project.variables
+                self._generate_variable(variable) for variable in project.variables
             ]
 
         if project.locals:
-            document["locals"] = self._convert_value(
-                project.locals
-            )
+            document["locals"] = self._convert_value(project.locals)
 
         if project.data_sources:
             document["data_sources"] = [
-                self._generate_data_source(data_source)
-                for data_source in project.data_sources
+                self._generate_data_source(data_source) for data_source in project.data_sources
             ]
 
         if project.resources:
             document["resources"] = [
-                self._generate_resource(resource)
-                for resource in project.resources
+                self._generate_resource(resource) for resource in project.resources
             ]
 
         if project.outputs:
-            document["outputs"] = [
-                self._generate_output(output)
-                for output in project.outputs
-            ]
+            document["outputs"] = [self._generate_output(output) for output in project.outputs]
 
         # Remove parser-specific metadata immediately before serialization.
         document = self._clean_internal_markers(document)
@@ -102,9 +90,7 @@ class YAMLGenerator:
         result: dict[str, Any] = {}
 
         for provider in providers:
-            configuration = self._convert_value(
-                provider.configuration
-            )
+            configuration = self._convert_value(provider.configuration)
 
             if provider.alias is not None:
                 configuration["alias"] = provider.alias
@@ -134,9 +120,7 @@ class YAMLGenerator:
             result["description"] = variable.description
 
         if variable.default is not None:
-            result["default"] = self._convert_value(
-                variable.default
-            )
+            result["default"] = self._convert_value(variable.default)
 
         if variable.sensitive:
             result["sensitive"] = True
@@ -145,9 +129,7 @@ class YAMLGenerator:
             result["nullable"] = variable.nullable
 
         if variable.validation:
-            result["validation"] = self._convert_value(
-                variable.validation
-            )
+            result["validation"] = self._convert_value(variable.validation)
 
         return result
 
@@ -162,38 +144,25 @@ class YAMLGenerator:
         result: dict[str, Any] = {
             "type": resource.type,
             "name": resource.name,
-            "properties": self._convert_value(
-                resource.attributes
-            ),
+            "properties": self._convert_value(resource.attributes),
         }
         if resource.blocks:
-            result["blocks"] = [
-                self._generate_block(block)
-                for block in resource.blocks
-            ]
+            result["blocks"] = [self._generate_block(block) for block in resource.blocks]
 
         if resource.count is not None:
             result["count"] = self._convert_value(resource.count)
 
         if resource.for_each is not None:
-            result["for_each"] = self._convert_value(
-                resource.for_each
-            )
+            result["for_each"] = self._convert_value(resource.for_each)
 
         if resource.depends_on:
-            result["depends_on"] = self._convert_value(
-                resource.depends_on
-            )
+            result["depends_on"] = self._convert_value(resource.depends_on)
 
         if resource.lifecycle:
-            result["lifecycle"] = self._convert_value(
-                resource.lifecycle
-            )
+            result["lifecycle"] = self._convert_value(resource.lifecycle)
 
         if resource.provisioners:
-            result["provisioners"] = self._convert_value(
-                resource.provisioners
-            )
+            result["provisioners"] = self._convert_value(resource.provisioners)
 
         return result
 
@@ -201,16 +170,11 @@ class YAMLGenerator:
         result: dict[str, Any] = {
             "type": block.type,
             "labels": list(block.labels),
-            "properties": self._convert_value(
-                block.attributes
-            ),
+            "properties": self._convert_value(block.attributes),
         }
 
         if block.blocks:
-            result["blocks"] = [
-                self._generate_block(child)
-                for child in block.blocks
-            ]
+            result["blocks"] = [self._generate_block(child) for child in block.blocks]
 
         return result
 
@@ -225,9 +189,7 @@ class YAMLGenerator:
         return {
             "type": data_source.type,
             "name": data_source.name,
-            "properties": self._convert_value(
-                data_source.attributes
-            ),
+            "properties": self._convert_value(data_source.attributes),
         }
 
     # ---------------------------------------------------------------
@@ -250,9 +212,7 @@ class YAMLGenerator:
             result["sensitive"] = True
 
         if output.depends_on:
-            result["depends_on"] = self._convert_value(
-                output.depends_on
-            )
+            result["depends_on"] = self._convert_value(output.depends_on)
 
         return result
 
@@ -269,11 +229,7 @@ class YAMLGenerator:
                 "reference": {
                     "resource_type": value.resource_type,
                     "resource_name": value.resource_name,
-                    **(
-                        {"attribute": value.attribute}
-                        if value.attribute is not None
-                        else {}
-                    ),
+                    **({"attribute": value.attribute} if value.attribute is not None else {}),
                 }
             }
 
@@ -291,14 +247,9 @@ class YAMLGenerator:
                 }
 
             if value.kind in {"list", "tuple"}:
-                return [
-                    self._convert_value(item)
-                    for item in value.items
-                ]
+                return [self._convert_value(item) for item in value.items]
 
-            raise YAMLGenerationError(
-                f"Unsupported collection kind: {value.kind}"
-            )
+            raise YAMLGenerationError(f"Unsupported collection kind: {value.kind}")
 
         if isinstance(value, dict):
             return {
@@ -308,16 +259,10 @@ class YAMLGenerator:
             }
 
         if isinstance(value, list):
-            return [
-                self._convert_value(item)
-                for item in value
-            ]
+            return [self._convert_value(item) for item in value]
 
         if isinstance(value, tuple):
-            return [
-                self._convert_value(item)
-                for item in value
-            ]
+            return [self._convert_value(item) for item in value]
 
         if value is None:
             return None
@@ -333,16 +278,10 @@ class YAMLGenerator:
             }
 
         if isinstance(value, list):
-            return [
-                self._convert_literal(item)
-                for item in value
-            ]
+            return [self._convert_literal(item) for item in value]
 
         if isinstance(value, tuple):
-            return [
-                self._convert_literal(item)
-                for item in value
-            ]
+            return [self._convert_literal(item) for item in value]
 
         return value
 
@@ -356,21 +295,13 @@ class YAMLGenerator:
             }
 
         if isinstance(value, list):
-            return [
-                self._clean_internal_markers(item)
-                for item in value
-            ]
+            return [self._clean_internal_markers(item) for item in value]
 
         if isinstance(value, tuple):
-            return [
-                self._clean_internal_markers(item)
-                for item in value
-            ]
+            return [self._clean_internal_markers(item) for item in value]
 
         return value
 
 
 def generate_yaml(project: ProjectIR) -> str:
     return YAMLGenerator().generate(project)
-
-

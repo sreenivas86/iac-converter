@@ -40,8 +40,6 @@ def test_local_reference_to_string() -> None:
     assert reference.to_string() == "local.bucket_prefix"
 
 
-
-
 def test_reference():
 
     reference = Reference(

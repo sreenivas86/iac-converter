@@ -1,11 +1,10 @@
-
+from iac_converter.generator.yaml import generate_yaml
 from iac_converter.ir import (
     CollectionExpression,
     Literal,
     Reference,
 )
 from iac_converter.parser.yaml_parser import parse_yaml
-from iac_converter.generator.yaml import generate_yaml
 
 
 def test_yaml_list_becomes_collection_expression():
@@ -93,6 +92,7 @@ resources:
 
     assert isinstance(reference, Reference)
     assert reference.to_string() == "aws_s3_bucket.data.id"
+
 
 def test_nested_typed_collections_survive_yaml_round_trip():
     source = """

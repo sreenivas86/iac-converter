@@ -43,6 +43,7 @@ resources:
 
     assert resource.attributes["bucket"] == Literal("company-data")
 
+
 def test_parse_reference():
 
     source = """

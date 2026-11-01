@@ -1,4 +1,3 @@
-
 import pytest
 
 from iac_converter.compiler import (
@@ -57,9 +56,7 @@ outputs:
 
     assert len(result.variables) == 1
     assert result.variables[0].name == "bucket_name"
-    assert result.variables[0].default == Literal(
-        "company-data"
-    )
+    assert result.variables[0].default == Literal("company-data")
 
     assert len(result.resources) == 1
 
@@ -68,9 +65,7 @@ outputs:
     assert resource.type == "aws_s3_bucket"
     assert resource.name == "data"
 
-    assert resource.attributes["bucket"] == RawExpression(
-        "var.bucket_name"
-    )
+    assert resource.attributes["bucket"] == RawExpression("var.bucket_name")
 
     assert len(result.outputs) == 1
 
@@ -132,9 +127,7 @@ resources:
 
     resource = result.resources[0]
 
-    assert resource.attributes["bucket"] == RawExpression(
-        "var.bucket_name"
-    )
+    assert resource.attributes["bucket"] == RawExpression("var.bucket_name")
 
     assert resource.attributes["source"] == Reference(
         resource_type="aws_s3_bucket",

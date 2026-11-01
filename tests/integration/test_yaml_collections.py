@@ -1,9 +1,9 @@
+from iac_converter.generator.yaml import generate_yaml
 from iac_converter.ir import (
     CollectionExpression,
     Literal,
     Reference,
 )
-from iac_converter.generator.yaml import generate_yaml
 from iac_converter.parser.yaml_parser import parse_yaml
 
 

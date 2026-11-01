@@ -1,4 +1,3 @@
-
 from iac_converter.compiler import parse_yaml_project
 from iac_converter.generator import generate_terraform_project
 
@@ -39,10 +38,7 @@ outputs:
     project_ir = parse_yaml_project(source)
     terraform_project = generate_terraform_project(project_ir)
 
-    files = {
-        project_file.path: project_file.content
-        for project_file in terraform_project.files
-    }
+    files = {project_file.path: project_file.content for project_file in terraform_project.files}
 
     assert "terraform.tf" in files
     assert "providers.tf" in files

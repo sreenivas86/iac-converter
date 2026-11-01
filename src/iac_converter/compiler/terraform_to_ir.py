@@ -7,10 +7,12 @@ import hcl2
 
 from iac_converter.ir import (
     Block,
-    DataSource,
     CollectionExpression,
     ConditionalExpression,
+    DataSource,
     DataSourceReference,
+    ForExpression,
+    ForVariableReference,
     FunctionCall,
     Literal,
     LocalReference,
@@ -22,8 +24,6 @@ from iac_converter.ir import (
     Resource,
     Variable,
     VariableReference,
-    ForExpression,
-    ForVariableReference,
 )
 
 
@@ -35,9 +35,7 @@ def parse_terraform(source: str) -> ProjectIR:
     try:
         document = hcl2.load(io.StringIO(source))
     except Exception as exc:
-        raise TerraformParseError(
-            f"Invalid Terraform configuration: {exc}"
-        ) from exc
+        raise TerraformParseError(f"Invalid Terraform configuration: {exc}") from exc
 
     return _to_ir(document)
 
@@ -117,25 +115,15 @@ def _parse_variables(
             variables.append(
                 Variable(
                     name=_strip_hcl_quotes(name),
-                    type=_convert_value(
-                        configuration.get("type")
-                    ),
-                    description=_unwrap_literal(
-                        configuration.get("description")
-                    ),
-                    default=_convert_value(
-                        configuration.get("default")
-                    ),
+                    type=_convert_value(configuration.get("type")),
+                    description=_unwrap_literal(configuration.get("description")),
+                    default=_convert_value(configuration.get("default")),
                     sensitive=_unwrap_bool(
                         configuration.get("sensitive"),
                         default=False,
                     ),
-                    nullable=_unwrap_optional_bool(
-                        configuration.get("nullable")
-                    ),
-                    validation=_parse_validation(
-                        configuration.get("validation")
-                    ),
+                    nullable=_unwrap_optional_bool(configuration.get("nullable")),
+                    validation=_parse_validation(configuration.get("validation")),
                 )
             )
 
@@ -178,34 +166,17 @@ def _parse_resources(
                     Resource(
                         type=_strip_hcl_quotes(resource_type),
                         name=_strip_hcl_quotes(resource_name),
-                        attributes=_parse_resource_attributes(
-                            configuration
-                        ),
-                        blocks=_parse_nested_blocks(
-                            configuration
-                        ),
-                        count=_convert_value(
-                            configuration.get("count")
-                        ),
-                        for_each=_convert_value(
-                            configuration.get("for_each")
-                        ),
-                        depends_on=_convert_value(
-                            configuration.get("depends_on", [])
-                        ),
-                        lifecycle=_convert_block(
-                            configuration.get("lifecycle")
-                        ),
-                        provisioners=_parse_provisioners(
-                            configuration.get("provisioner")
-                        ),
+                        attributes=_parse_resource_attributes(configuration),
+                        blocks=_parse_nested_blocks(configuration),
+                        count=_convert_value(configuration.get("count")),
+                        for_each=_convert_value(configuration.get("for_each")),
+                        depends_on=_convert_value(configuration.get("depends_on", [])),
+                        lifecycle=_convert_block(configuration.get("lifecycle")),
+                        provisioners=_parse_provisioners(configuration.get("provisioner")),
                     )
                 )
 
     return resources
-
-
-
 
 
 def _parse_block_attributes(
@@ -214,8 +185,7 @@ def _parse_block_attributes(
     return {
         key: _convert_value(value)
         for key, value in configuration.items()
-        if key != "__is_block__"
-        and not _is_nested_block_value(value)
+        if key != "__is_block__" and not _is_nested_block_value(value)
     }
 
 
@@ -278,8 +248,7 @@ def _parse_resource_attributes(
     return {
         key: _convert_value(value)
         for key, value in configuration.items()
-        if key not in meta_arguments
-        and not _is_nested_block_value(value)
+        if key not in meta_arguments and not _is_nested_block_value(value)
     }
 
 
@@ -289,10 +258,7 @@ def _is_nested_block_value(
     if not isinstance(value, list):
         return False
 
-    return any(
-        isinstance(item, dict) and "__is_block__" in item
-        for item in value
-    )
+    return any(isinstance(item, dict) and "__is_block__" in item for item in value)
 
 
 def _parse_data_sources(
@@ -321,9 +287,7 @@ def _parse_data_sources(
                             for key, value in configuration.items()
                             if key != "__is_block__"
                         },
-                        depends_on=_convert_value(
-                            configuration.get("depends_on", [])
-                        ),
+                        depends_on=_convert_value(configuration.get("depends_on", [])),
                     )
                 )
 
@@ -346,19 +310,13 @@ def _parse_outputs(
             outputs.append(
                 Output(
                     name=_strip_hcl_quotes(name),
-                    value=_convert_value(
-                        configuration.get("value")
-                    ),
-                    description=_unwrap_literal(
-                        configuration.get("description")
-                    ),
+                    value=_convert_value(configuration.get("value")),
+                    description=_unwrap_literal(configuration.get("description")),
                     sensitive=_unwrap_bool(
                         configuration.get("sensitive"),
                         default=False,
                     ),
-                    depends_on=_convert_value(
-                        configuration.get("depends_on")
-                    ),
+                    depends_on=_convert_value(configuration.get("depends_on")),
                 )
             )
 
@@ -396,33 +354,20 @@ def _convert_block(
     if isinstance(value, list):
         if len(value) == 1 and isinstance(value[0], dict):
             return {
-                key: _convert_value(item)
-                for key, item in value[0].items()
-                if key != "__is_block__"
+                key: _convert_value(item) for key, item in value[0].items() if key != "__is_block__"
             }
 
-        return {
-            str(index): _convert_value(item)
-            for index, item in enumerate(value)
-        }
+        return {str(index): _convert_value(item) for index, item in enumerate(value)}
 
     if isinstance(value, dict):
-        return {
-            key: _convert_value(item)
-            for key, item in value.items()
-            if key != "__is_block__"
-        }
+        return {key: _convert_value(item) for key, item in value.items() if key != "__is_block__"}
 
     return {}
 
 
 def _convert_mapping(value: dict[str, Any]) -> dict[str, Any]:
     """Convert a structural HCL mapping while keeping its outer shape."""
-    return {
-        key: _convert_value(item)
-        for key, item in value.items()
-        if key != "__is_block__"
-    }
+    return {key: _convert_value(item) for key, item in value.items() if key != "__is_block__"}
 
 
 def _convert_value(
@@ -441,9 +386,7 @@ def _convert_value(
         return CollectionExpression(
             kind="map",
             items=tuple(
-                (key, _convert_value(item))
-                for key, item in value.items()
-                if key != "__is_block__"
+                (key, _convert_value(item)) for key, item in value.items() if key != "__is_block__"
             ),
         )
 
@@ -496,6 +439,7 @@ def _extract_expression(
 
     return None
 
+
 def _strip_outer_parentheses(expression: str) -> str:
     """Remove parentheses only when they enclose the entire expression."""
     expression = expression.strip()
@@ -532,14 +476,13 @@ def _strip_outer_parentheses(expression: str) -> str:
         expression = expression[1:-1].strip()
 
     return expression
+
+
 def _parse_map_expression(expression: str) -> CollectionExpression | None:
     """Parse a simple Terraform object/map literal into structured IR."""
     expression = expression.strip()
 
-    if not (
-        expression.startswith("{")
-        and expression.endswith("}")
-    ):
+    if not (expression.startswith("{") and expression.endswith("}")):
         return None
 
     inner = expression[1:-1].strip()
@@ -554,7 +497,7 @@ def _parse_map_expression(expression: str) -> CollectionExpression | None:
             return None
 
         key_text = entry[:separator].strip()
-        value_text = entry[separator + 1:].strip()
+        value_text = entry[separator + 1 :].strip()
 
         if not key_text or not value_text:
             return None
@@ -571,6 +514,7 @@ def _parse_map_expression(expression: str) -> CollectionExpression | None:
         kind="map",
         items=tuple(items),
     )
+
 
 def _find_top_level_keyword(expression: str, keyword: str) -> int:
     """Find a keyword outside strings and nested delimiters."""
@@ -601,18 +545,13 @@ def _find_top_level_keyword(expression: str, keyword: str) -> int:
         elif depth == 0 and expression.startswith(keyword, index):
             before = expression[index - 1] if index > 0 else " "
             after_index = index + len(keyword)
-            after = (
-                expression[after_index]
-                if after_index < len(expression)
-                else " "
-            )
+            after = expression[after_index] if after_index < len(expression) else " "
             if before.isspace() and after.isspace():
                 return index
 
         index += 1
 
     return -1
-
 
 
 def _parse_for_expression(expression: str) -> ForExpression | None:
@@ -637,21 +576,22 @@ def _parse_for_expression(expression: str) -> ForExpression | None:
     variable, collection_text = iterator_clause.split(" in ", 1)
     variable = variable.strip()
     collection_text = collection_text.strip()
-    result_clause = inner[colon_index + 1:].strip()
+    result_clause = inner[colon_index + 1 :].strip()
 
     if not variable or not collection_text or not result_clause:
         return None
 
-    if not (
-        variable[0].isalpha() or variable[0] == "_"
-    ) or not variable.replace("_", "a").isalnum():
+    if (
+        not (variable[0].isalpha() or variable[0] == "_")
+        or not variable.replace("_", "a").isalnum()
+    ):
         return None
 
     condition = None
     if_index = _find_top_level_keyword(result_clause, "if")
     if if_index >= 0:
         result_text = result_clause[:if_index].strip()
-        condition_text = result_clause[if_index + 2:].strip()
+        condition_text = result_clause[if_index + 2 :].strip()
         if not result_text or not condition_text:
             return None
     else:
@@ -659,7 +599,7 @@ def _parse_for_expression(expression: str) -> ForExpression | None:
         condition_text = None
 
     grouping = False
-    
+
     if is_map and result_text.endswith("..."):
         grouping = True
         result_text = result_text[:-3].rstrip()
@@ -681,7 +621,7 @@ def _parse_for_expression(expression: str) -> ForExpression | None:
             return None
 
         key_text = result_text[:arrow_index].strip()
-        value_text = result_text[arrow_index + 2:].strip()
+        value_text = result_text[arrow_index + 2 :].strip()
 
         if not key_text or not value_text:
             return None
@@ -720,7 +660,6 @@ def _parse_for_expression(expression: str) -> ForExpression | None:
     )
 
 
-
 def _parse_structured_expression(
     expression: str,
     for_variables: set[str] | None = None,
@@ -728,18 +667,13 @@ def _parse_structured_expression(
     """Parse common Terraform expressions into typed IR nodes."""
     expression = _strip_outer_parentheses(expression.strip())
 
-    if (
-        expression.startswith("[for ")
-        and expression.endswith("]")
-    ) or (
-        expression.startswith("{for ")
-        and expression.endswith("}")
+    if (expression.startswith("[for ") and expression.endswith("]")) or (
+        expression.startswith("{for ") and expression.endswith("}")
     ):
         return _parse_for_expression(expression)
 
     if expression.startswith("{") and expression.endswith("}"):
         return _parse_map_expression(expression)
-    
 
     if expression.startswith("[for ") and expression.endswith("]"):
         return _parse_for_expression(expression)
@@ -775,11 +709,7 @@ def _parse_structured_expression(
             for_variables=for_variables,
         )
 
-        if (
-            condition is not None
-            and true_value is not None
-            and false_value is not None
-        ):
+        if condition is not None and true_value is not None and false_value is not None:
             return ConditionalExpression(
                 condition=condition,
                 true_value=true_value,
@@ -851,7 +781,7 @@ def _parse_function_call(
     if not name.replace("_", "a").isalnum() or not name[0].isalpha():
         return None
 
-    inner = expression[opening + 1:-1].strip()
+    inner = expression[opening + 1 : -1].strip()
     if not inner:
         return FunctionCall(name=name, arguments=())
 
@@ -878,8 +808,8 @@ def _split_conditional(expression: str) -> tuple[str, str, str] | None:
         return None
 
     condition = expression[:question_index].strip()
-    true_value = expression[question_index + 1:colon_index].strip()
-    false_value = expression[colon_index + 1:].strip()
+    true_value = expression[question_index + 1 : colon_index].strip()
+    false_value = expression[colon_index + 1 :].strip()
     if not condition or not true_value or not false_value:
         return None
     return condition, true_value, false_value
@@ -905,7 +835,7 @@ def _split_top_level(value: str, delimiter: str) -> list[str]:
             in_string = True
         elif character in "([{":
             depth += 1
-        elif character in ")]}" :
+        elif character in ")]}":
             depth -= 1
         elif character == delimiter and depth == 0:
             parts.append(value[start:index].strip())
@@ -934,11 +864,12 @@ def _find_top_level_character(value: str, target: str, start: int = 0) -> int:
             in_string = True
         elif character in "([{":
             depth += 1
-        elif character in ")]}" :
+        elif character in ")]}":
             depth -= 1
         elif character == target and depth == 0:
             return index
     return -1
+
 
 def _parse_reference(expression: str) -> Any | None:
     """Parse simple Terraform references into typed IR expressions.
@@ -951,10 +882,7 @@ def _parse_reference(expression: str) -> Any | None:
 
     # Expressions containing operators, function calls, indexes, or other
     # syntax are outside the scope of simple-reference parsing.
-    if any(
-        char in expression
-        for char in ("?", ":", "(", ")", "[", "]", ",", " ", '"')
-    ):
+    if any(char in expression for char in ("?", ":", "(", ")", "[", "]", ",", " ", '"')):
         return None
 
     parts = expression.split(".")
@@ -1061,7 +989,6 @@ def _unwrap_string(
     return value
 
 
-
 def _parse_nested_blocks(
     configuration: dict[str, Any],
 ) -> list[Block]:
@@ -1109,12 +1036,8 @@ def _parse_nested_blocks(
                 Block(
                     type=_strip_hcl_quotes(key),
                     labels=labels,
-                    attributes=_parse_block_attributes(
-                        block_configuration
-                    ),
-                    blocks=_parse_nested_blocks(
-                        block_configuration
-                    ),
+                    attributes=_parse_block_attributes(block_configuration),
+                    blocks=_parse_nested_blocks(block_configuration),
                 )
             )
 

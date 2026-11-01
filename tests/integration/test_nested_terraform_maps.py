@@ -1,4 +1,3 @@
-
 from iac_converter.compiler.terraform_to_ir import parse_terraform
 from iac_converter.ir import (
     CollectionExpression,
@@ -112,6 +111,7 @@ output "settings" {
     assert reparsed_function.name == "lower"
     assert reparsed_function.arguments == (Literal("MY-BUCKET"),)
 
+
 def test_map_preserves_conditional_expression_through_terraform_round_trip():
     source = """
 variable "create_bucket" {
@@ -152,48 +152,6 @@ output "settings" {
     assert reparsed_conditional.true_value == Literal("enabled")
     assert reparsed_conditional.false_value == Literal("disabled")
 
-def test_nested_function_calls_round_trip():
-    source = """
-output "settings" {
-  value = {
-    normalized_name = lower(trimspace(var.bucket_name))
-  }
-}
-"""
-    from iac_converter.generator.terraform import generate_terraform
-
-    first_project = parse_terraform(source)
-    first_expression = first_project.outputs[0].value
-
-    assert isinstance(first_expression, CollectionExpression)
-    first_values = dict(first_expression.items)
-    outer = first_values["normalized_name"]
-
-    assert isinstance(outer, FunctionCall)
-    assert outer.name == "lower"
-    assert len(outer.arguments) == 1
-
-    inner = outer.arguments[0]
-    assert isinstance(inner, FunctionCall)
-    assert inner.name == "trimspace"
-    assert inner.arguments == (VariableReference(name="bucket_name"),)
-
-    generated = generate_terraform(first_project)
-    second_project = parse_terraform(generated)
-    second_expression = second_project.outputs[0].value
-
-    assert isinstance(second_expression, CollectionExpression)
-    second_values = dict(second_expression.items)
-    reparsed_outer = second_values["normalized_name"]
-
-    assert isinstance(reparsed_outer, FunctionCall)
-    assert reparsed_outer.name == "lower"
-    assert isinstance(reparsed_outer.arguments[0], FunctionCall)
-    assert reparsed_outer.arguments[0].name == "trimspace"
-    assert reparsed_outer.arguments[0].arguments == (
-        VariableReference(name="bucket_name"),
-    )
-
 
 def test_nested_function_calls_round_trip():
     source = """
@@ -233,9 +191,7 @@ output "settings" {
     assert reparsed_outer.name == "lower"
     assert isinstance(reparsed_outer.arguments[0], FunctionCall)
     assert reparsed_outer.arguments[0].name == "trimspace"
-    assert reparsed_outer.arguments[0].arguments == (
-        VariableReference(name="bucket_name"),
-    )
+    assert reparsed_outer.arguments[0].arguments == (VariableReference(name="bucket_name"),)
 
 
 def test_nested_conditional_expression_round_trip():
@@ -390,9 +346,7 @@ output "upper_names" {
     assert first_expression.collection == VariableReference(name="names")
     assert first_expression.condition is None
     assert first_expression.key is None
-    assert first_expression.value.arguments == (
-        ForVariableReference(name="name"),
-    )
+    assert first_expression.value.arguments == (ForVariableReference(name="name"),)
 
     generated = generate_terraform(first_project)
     assert "[for name in var.names : upper(name)]" in generated
@@ -402,7 +356,6 @@ output "upper_names" {
 
     assert isinstance(second_expression, ForExpression)
     assert second_expression == first_expression
-
 
 
 def test_filtered_list_comprehension_round_trip():
@@ -429,24 +382,18 @@ output "filtered_names" {
     assert isinstance(expression, ForExpression)
     assert expression.variable == "name"
     assert expression.condition is not None
-    assert expression.condition == RawExpression(
-        value='name != "skip"'
-    )
-    assert expression.value.arguments == (
-        ForVariableReference(name="name"),
-    )
+    assert expression.condition == RawExpression(value='name != "skip"')
+    assert expression.value.arguments == (ForVariableReference(name="name"),)
 
     generated = generate_terraform(project)
-    assert (
-        '[for name in var.names : upper(name) if name != "skip"]'
-        in generated
-    )
+    assert '[for name in var.names : upper(name) if name != "skip"]' in generated
 
     reparsed = parse_terraform(generated)
     reparsed_expression = reparsed.outputs[0].value
 
     assert isinstance(reparsed_expression, ForExpression)
     assert reparsed_expression.condition == expression.condition
+
 
 def test_map_comprehension_round_trip():
     source = """
@@ -470,15 +417,14 @@ output "name_map" {
     assert isinstance(expression, ForExpression)
     assert expression.variable == "name"
     assert expression.key == ForVariableReference(name="name")
-    assert expression.value.arguments == (
-        ForVariableReference(name="name"),
-    )
+    assert expression.value.arguments == (ForVariableReference(name="name"),)
 
     generated = generate_terraform(project)
     assert "for name in var.names : name => upper(name)" in generated
 
     reparsed = parse_terraform(generated)
     assert reparsed.outputs[0].value == expression
+
 
 def test_grouped_filtered_map_comprehension_generation():
     source = """

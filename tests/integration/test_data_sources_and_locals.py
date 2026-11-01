@@ -1,4 +1,3 @@
-
 from iac_converter.compiler import (
     parse_terraform_project,
     parse_yaml_project,
@@ -61,15 +60,9 @@ resources:
     assert "environment" in round_trip_ir.locals
     assert "bucket_prefix" in round_trip_ir.locals
 
-    assert (
-        round_trip_ir.locals["environment"].value
-        == original_ir.locals["environment"]
-    )
+    assert round_trip_ir.locals["environment"].value == original_ir.locals["environment"]
 
-    assert (
-        round_trip_ir.locals["bucket_prefix"].value
-        == original_ir.locals["bucket_prefix"]
-    )
+    assert round_trip_ir.locals["bucket_prefix"].value == original_ir.locals["bucket_prefix"]
 
     # ---------------------------------------------------------
     # Data sources
@@ -95,10 +88,7 @@ resources:
     assert round_trip_resource.type == original_resource.type
     assert round_trip_resource.name == original_resource.name
 
-    assert (
-        round_trip_resource.attributes["bucket"]
-        == original_resource.attributes["bucket"]
-    )
+    assert round_trip_resource.attributes["bucket"] == original_resource.attributes["bucket"]
 
     assert (
         round_trip_resource.attributes["tags"]["Environment"]

@@ -1,14 +1,10 @@
-
+from iac_converter.generator.terraform import generate_terraform
+from iac_converter.generator.yaml import generate_yaml
 from iac_converter.ir import (
     CollectionExpression,
-    FunctionCall,
-    Literal,
     RawExpression,
     Reference,
 )
-
-from iac_converter.generator.terraform import generate_terraform
-from iac_converter.generator.yaml import generate_yaml
 from iac_converter.parser.terraform_parser import parse_terraform
 from iac_converter.parser.yaml_parser import parse_yaml
 
@@ -45,6 +41,7 @@ resource "aws_s3_bucket" "data" {
     assert "aws_s3_bucket" in result
     assert "company-data" in result
 
+
 def test_reference_preservation():
 
     source = """
@@ -66,6 +63,7 @@ resource "aws_s3_bucket_policy" "policy" {
     assert "resource_name: data" in result
     assert "attribute: id" in result
 
+
 def test_expression_preservation():
 
     source = """
@@ -80,9 +78,6 @@ resource "aws_s3_bucket" "data" {
 
     assert "expression:" in result
     assert "var.create_bucket ? 1 : 0" in result
-
-
-
 
 
 def test_full_round_trip():
@@ -140,7 +135,6 @@ resources:
 
     assert policy.type == "aws_s3_bucket_policy"
     assert policy.name == "policy"
-
 
 
 def test_nested_map_preserves_reference_and_function_call():

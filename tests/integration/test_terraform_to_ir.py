@@ -35,9 +35,7 @@ resource "aws_s3_bucket" "data" {
     provider = project.providers[0]
 
     assert provider.name == "aws"
-    assert provider.configuration["region"] == Literal(
-        "ap-south-1"
-    )
+    assert provider.configuration["region"] == Literal("ap-south-1")
 
     assert len(project.resources) == 1
 
@@ -46,9 +44,8 @@ resource "aws_s3_bucket" "data" {
     assert resource.type == "aws_s3_bucket"
     assert resource.name == "data"
 
-    assert resource.attributes["bucket"] == Literal(
-        "company-data"
-    )
+    assert resource.attributes["bucket"] == Literal("company-data")
+
 
 def test_terraform_reference_to_ir():
 
@@ -74,6 +71,7 @@ resource "aws_s3_bucket_policy" "policy" {
     assert bucket.resource_name == "data"
     assert bucket.attribute == "id"
 
+
 def test_terraform_expression_to_ir():
 
     source = """
@@ -88,9 +86,8 @@ resource "aws_s3_bucket" "data" {
 
     assert resource.count is not None
 
-    assert resource.count.value == (
-        "var.create_bucket ? 1 : 0"
-    )
+    assert resource.count.value == ("var.create_bucket ? 1 : 0")
+
 
 def test_terraform_round_trip():
 

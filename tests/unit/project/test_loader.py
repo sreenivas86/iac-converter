@@ -85,6 +85,7 @@ def test_load_project_rejects_file_path(tmp_path: Path) -> None:
     with pytest.raises(ProjectLoadError, match="not a directory"):
         load_project(file_path)
 
+
 def test_load_project_accepts_string_path(tmp_path: Path) -> None:
     (tmp_path / "main.tf").write_text(
         'resource "aws_s3_bucket" "data" {}\n',

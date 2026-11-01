@@ -1,4 +1,4 @@
-from iac_converter.ir import Block, Literal, Reference
+from iac_converter.ir import Block, Literal
 from iac_converter.parser.terraform_parser import parse_terraform
 
 

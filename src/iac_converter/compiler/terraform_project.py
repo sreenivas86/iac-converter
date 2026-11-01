@@ -20,9 +20,7 @@ def parse_terraform_project(project: Project) -> ProjectIR:
     terraform_files = project.terraform_files()
 
     if not terraform_files:
-        raise TerraformProjectParseError(
-            "Project does not contain any Terraform (.tf) files."
-        )
+        raise TerraformProjectParseError("Project does not contain any Terraform (.tf) files.")
 
     merged = ProjectIR()
 

@@ -29,7 +29,7 @@ resources:
 
     terraform = generate_terraform(project)
 
-    assert 'terraform {' in terraform
+    assert "terraform {" in terraform
     assert 'required_version = ">= 1.6.0"' in terraform
 
     assert 'provider "aws" {' in terraform
@@ -62,10 +62,8 @@ resources:
 
     terraform = generate_terraform(project)
 
-    assert (
-        "bucket = aws_s3_bucket.data.id"
-        in terraform
-    )
+    assert "bucket = aws_s3_bucket.data.id" in terraform
+
 
 def test_yaml_to_terraform_expression():
 

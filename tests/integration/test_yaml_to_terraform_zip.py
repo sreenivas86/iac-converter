@@ -1,4 +1,3 @@
-
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -54,10 +53,7 @@ outputs:
     assert archive_path.is_file()
 
     with ZipFile(archive_path, "r") as archive:
-        files = {
-            name: archive.read(name).decode("utf-8")
-            for name in archive.namelist()
-        }
+        files = {name: archive.read(name).decode("utf-8") for name in archive.namelist()}
 
     assert "terraform.tf" in files
     assert "providers.tf" in files
@@ -78,4 +74,3 @@ outputs:
 
     assert 'output "bucket_id"' in files["outputs.tf"]
     assert "value = aws_s3_bucket.data.id" in files["outputs.tf"]
-

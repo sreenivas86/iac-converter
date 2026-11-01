@@ -1,7 +1,7 @@
 from .yaml_schema import (
     YAMLDataSource,
-    YAMLProject,
     YAMLOutput,
+    YAMLProject,
     YAMLProvider,
     YAMLResource,
     YAMLVariable,
@@ -9,8 +9,8 @@ from .yaml_schema import (
 
 __all__ = [
     "YAMLDataSource",
-    "YAMLProject",
     "YAMLOutput",
+    "YAMLProject",
     "YAMLProvider",
     "YAMLResource",
     "YAMLVariable",

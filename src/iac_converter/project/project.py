@@ -16,7 +16,5 @@ class Project:
     def terraform_files(self) -> list[ProjectFile]:
         """Return Terraform files in the project."""
         return [
-            project_file
-            for project_file in self.files
-            if project_file.path.lower().endswith(".tf")
+            project_file for project_file in self.files if project_file.path.lower().endswith(".tf")
         ]

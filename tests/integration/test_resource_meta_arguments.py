@@ -1,11 +1,10 @@
-
 from iac_converter.compiler import (
     parse_terraform_project,
     parse_yaml_project,
 )
 from iac_converter.generator import generate_terraform
-from iac_converter.project import Project, ProjectFile
 from iac_converter.ir import RawExpression, Reference
+from iac_converter.project import Project, ProjectFile
 
 
 def test_resource_meta_arguments_round_trip() -> None:
@@ -66,11 +65,11 @@ resources:
 
     terraform_source = generate_terraform(original_ir)
 
-    assert 'count = var.bucket_count' in terraform_source
-    assert 'for_each = var.buckets' in terraform_source
-    assert 'depends_on = [aws_s3_bucket.data.id]' in terraform_source
-    assert 'bucket = var.bucket_name' in terraform_source
-    assert 'bucket = each.value' in terraform_source
+    assert "count = var.bucket_count" in terraform_source
+    assert "for_each = var.buckets" in terraform_source
+    assert "depends_on = [aws_s3_bucket.data.id]" in terraform_source
+    assert "bucket = var.bucket_name" in terraform_source
+    assert "bucket = each.value" in terraform_source
 
     # ---------------------------------------------------------
     # Terraform -> Project
@@ -131,16 +130,10 @@ resources:
         round_trip_data.attributes["bucket"],
         RawExpression,
     )
-    assert (
-        round_trip_data.attributes["bucket"].value
-        == "var.bucket_name"
-    )
+    assert round_trip_data.attributes["bucket"].value == "var.bucket_name"
 
     assert isinstance(
         round_trip_logs.attributes["bucket"],
         RawExpression,
     )
-    assert (
-        round_trip_logs.attributes["bucket"].value
-        == "each.value"
-    )
+    assert round_trip_logs.attributes["bucket"].value == "each.value"

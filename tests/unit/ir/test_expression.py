@@ -1,4 +1,3 @@
-
 import pytest
 
 from iac_converter.ir import (
@@ -42,9 +41,7 @@ def test_function_call_can_contain_typed_references() -> None:
     )
 
     assert expression.name == "tostring"
-    assert expression.arguments == (
-        VariableReference(name="instance_count"),
-    )
+    assert expression.arguments == (VariableReference(name="instance_count"),)
 
 
 def test_conditional_expression_preserves_all_parts() -> None:

@@ -1,11 +1,10 @@
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
 
 class Expression:
     """Base class for Terraform expressions."""
-
-    pass
 
 
 @dataclass(frozen=True)
@@ -43,6 +42,7 @@ class ConditionalExpression(Expression):
     true_value: Expression
     false_value: Expression
 
+
 @dataclass(frozen=True)
 class ForExpression(Expression):
     """A Terraform for-expression that produces a list or object."""
@@ -54,6 +54,7 @@ class ForExpression(Expression):
     key_variable: str | None = None
     condition: Expression | None = None
     grouping: bool = False
+
 
 @dataclass(frozen=True)
 class CollectionExpression(Expression):
@@ -69,9 +70,7 @@ class CollectionExpression(Expression):
 
     def __post_init__(self) -> None:
         if self.kind not in {"list", "tuple", "map"}:
-            raise ValueError(
-                "CollectionExpression kind must be 'list', 'tuple', or 'map'."
-            )
+            raise ValueError("CollectionExpression kind must be 'list', 'tuple', or 'map'.")
 
     def __len__(self) -> int:
         return len(self.items)
@@ -79,7 +78,7 @@ class CollectionExpression(Expression):
     def __bool__(self) -> bool:
         return bool(self.items)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         if self.kind == "map":
             return iter(key for key, _ in self.items)
         return iter(self.items)
