@@ -1,9 +1,11 @@
 README.md
 pyproject.toml
 src/iac_converter/__init__.py
+src/iac_converter/cli.py
 src/iac_converter.egg-info/PKG-INFO
 src/iac_converter.egg-info/SOURCES.txt
 src/iac_converter.egg-info/dependency_links.txt
+src/iac_converter.egg-info/entry_points.txt
 src/iac_converter.egg-info/requires.txt
 src/iac_converter.egg-info/top_level.txt
 src/iac_converter/api/__init__.py

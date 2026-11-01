@@ -43,3 +43,6 @@ strict = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.scripts]
+iac-converter = "iac_converter.cli:main"
