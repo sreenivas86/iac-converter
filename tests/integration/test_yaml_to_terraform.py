@@ -119,3 +119,43 @@ outputs:
     # Expressions must not be rendered as quoted strings.
     assert '"aws_s3_bucket.data.id"' not in terraform
     assert '"lower(\\"MY-BUCKET\\")"' not in terraform
+
+
+def test_yaml_module_to_terraform():
+    source = """
+version: "1"
+modules:
+  - name: vpc
+    source: ./modules/vpc
+    arguments:
+      cidr_block: 10.0.0.0/16
+      environment: production
+"""
+
+    project = parse_yaml(source)
+    terraform = generate_terraform(project)
+
+    assert 'module "vpc" {' in terraform
+    assert 'source = "./modules/vpc"' in terraform
+    assert 'cidr_block = "10.0.0.0/16"' in terraform
+    assert 'environment = "production"' in terraform
+
+
+def test_yaml_module_meta_arguments_to_terraform():
+    source = """
+modules:
+  - name: vpc
+    source: ./modules/vpc
+    count:
+      expression: "var.create_vpc ? 1 : 0"
+    depends_on:
+      - expression: "aws_s3_bucket.data"
+"""
+
+    project = parse_yaml(source)
+    terraform = generate_terraform(project)
+
+    assert 'module "vpc" {' in terraform
+    assert 'source = "./modules/vpc"' in terraform
+    assert "count = var.create_vpc ? 1 : 0" in terraform
+    assert "depends_on = [aws_s3_bucket.data]" in terraform

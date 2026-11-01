@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .data_source import DataSource
+from .module import Module
 from .output import Output
 from .provider import Provider
 from .resource import Resource
@@ -29,6 +30,8 @@ class ProjectIR:
     data_sources: list[DataSource] = field(default_factory=list)
 
     outputs: list[Output] = field(default_factory=list)
+
+    modules: list[Module] = field(default_factory=list)
 
     locals: dict[str, Any] = field(default_factory=dict)
 

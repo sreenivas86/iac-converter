@@ -9,6 +9,7 @@ from iac_converter.ir import (
     Block,
     DataSource,
     Literal,
+    Module,
     Output,
     ProjectIR,
     Provider,
@@ -44,6 +45,7 @@ def _to_ir(document: dict[str, Any]) -> ProjectIR:
         resources=_parse_resources(document),
         data_sources=_parse_data_sources(document),
         outputs=_parse_outputs(document),
+        modules=_parse_modules(document),
         locals=_parse_locals(document),
     )
 
@@ -288,6 +290,56 @@ def _parse_data_sources(
                 )
 
     return data_sources
+
+
+def _parse_modules(document: dict[str, Any]) -> list[Module]:
+    modules: list[Module] = []
+
+    for block in document.get("module", []):
+        if not isinstance(block, dict):
+            continue
+
+        for name, configuration in block.items():
+            if not isinstance(configuration, dict):
+                configuration = {}
+
+            source = configuration.get("source")
+
+            if source is None:
+                raise TerraformParseError(
+                    f"Module '{name}' is missing its required source argument."
+                )
+
+            source = _unwrap_literal(source)
+
+            if not isinstance(source, str) or not source.strip():
+                raise TerraformParseError(f"Module '{name}' must have a non-empty string source.")
+
+            arguments = {
+                key: _convert_value(value)
+                for key, value in configuration.items()
+                if key
+                not in {
+                    "source",
+                    "count",
+                    "for_each",
+                    "depends_on",
+                    "__is_block__",
+                }
+            }
+
+            modules.append(
+                Module(
+                    name=_strip_hcl_quotes(name),
+                    source=source,
+                    arguments=arguments,
+                    count=_convert_value(configuration.get("count")),
+                    for_each=_convert_value(configuration.get("for_each")),
+                    depends_on=_convert_value(configuration.get("depends_on", [])),
+                )
+            )
+
+    return modules
 
 
 def _parse_outputs(

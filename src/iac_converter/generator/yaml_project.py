@@ -6,10 +6,12 @@ import yaml
 
 from iac_converter.ir import (
     Literal,
+    ProjectFileIR,
     ProjectIR,
     RawExpression,
     Reference,
 )
+from iac_converter.project import Project, ProjectFile
 
 
 class YAMLProjectGenerationError(ValueError):
@@ -50,6 +52,8 @@ def generate_yaml_project(project: ProjectIR) -> str:
     if project.resources:
         document["resources"] = [_resource_to_dict(resource) for resource in project.resources]
 
+    if project.modules:
+        document["modules"] = [_module_to_dict(module) for module in project.modules]
     if project.outputs:
         document["outputs"] = [_output_to_dict(output) for output in project.outputs]
 
@@ -81,6 +85,35 @@ def generate_yaml_project(project: ProjectIR) -> str:
         )
 
     return content
+
+
+def generate_yaml_project_files(
+    project_files: list[ProjectFileIR],
+) -> Project:
+    """
+    Generate YAML files while preserving the original Terraform file paths.
+    """
+
+    generated_files: list[ProjectFile] = []
+
+    for project_file in project_files:
+        path = project_file.path
+
+        if not path.lower().endswith(".tf"):
+            continue
+
+        yaml_path = path[:-3] + ".yaml"
+        content = generate_yaml_project(project_file.project)
+
+        if content.strip():
+            generated_files.append(ProjectFile(path=yaml_path, content=content))
+
+    if not generated_files:
+        raise YAMLProjectGenerationError(
+            "No YAML files could be generated from the Terraform project"
+        )
+
+    return Project(files=generated_files)
 
 
 def _provider_to_dict(provider: Any) -> dict[str, Any]:
@@ -154,6 +187,25 @@ def _data_source_to_dict(data_source: Any) -> dict[str, Any]:
 
     if data_source.depends_on:
         result["depends_on"] = _convert_value(data_source.depends_on)
+
+    return result
+
+
+def _module_to_dict(module: Any) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "name": module.name,
+        "source": module.source,
+        "arguments": _convert_mapping(module.arguments),
+    }
+
+    if module.count is not None:
+        result["count"] = _convert_value(module.count)
+
+    if module.for_each is not None:
+        result["for_each"] = _convert_value(module.for_each)
+
+    if module.depends_on:
+        result["depends_on"] = _convert_value(module.depends_on)
 
     return result
 

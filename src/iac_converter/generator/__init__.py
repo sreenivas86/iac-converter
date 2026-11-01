@@ -5,10 +5,12 @@ from iac_converter.generator.terraform import (
 from iac_converter.generator.terraform_project import (
     TerraformProjectGenerationError,
     generate_terraform_project,
+    generate_terraform_project_files,
 )
 from iac_converter.generator.yaml_project import (
     YAMLProjectGenerationError,
     generate_yaml_project,
+    generate_yaml_project_files,
 )
 
 __all__ = [
@@ -17,5 +19,7 @@ __all__ = [
     "YAMLProjectGenerationError",
     "generate_terraform",
     "generate_terraform_project",
+    "generate_terraform_project_files",
     "generate_yaml_project",
+    "generate_yaml_project_files",
 ]

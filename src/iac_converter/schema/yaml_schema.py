@@ -101,6 +101,24 @@ class YAMLOutput(BaseModel):
     sensitive: bool = False
 
 
+class YAMLModule(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    source: str = Field(min_length=1)
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    count: Any | None = None
+    for_each: Any | None = None
+    depends_on: list[Any] = Field(default_factory=list)
+
+    @field_validator("name", "source")
+    @classmethod
+    def validate_non_empty_strings(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Value must not be empty or whitespace")
+        return value
+
+
 class YAMLProject(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -116,5 +134,6 @@ class YAMLProject(BaseModel):
     data_sources: list[YAMLDataSource] = Field(default_factory=list)
 
     outputs: list[YAMLOutput] = Field(default_factory=list)
+    modules: list[YAMLModule] = Field(default_factory=list)
 
     locals: dict[str, Any] = Field(default_factory=dict)

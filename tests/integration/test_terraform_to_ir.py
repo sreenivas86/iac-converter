@@ -1,5 +1,7 @@
 from iac_converter.ir import (
     Literal,
+    Module,
+    RawExpression,
     Reference,
 )
 from iac_converter.parser.terraform_parser import parse_terraform
@@ -113,3 +115,44 @@ resource "aws_s3_bucket" "data" {
     assert resource1.type == resource2.type
     assert resource1.name == resource2.name
     assert resource1.attributes == resource2.attributes
+
+
+def test_terraform_module_to_ir():
+    source = """
+module "vpc" {
+  source      = "./modules/vpc"
+  cidr_block  = "10.0.0.0/16"
+  environment = "production"
+}
+"""
+
+    project = parse_terraform(source)
+
+    assert len(project.modules) == 1
+
+    module = project.modules[0]
+
+    assert isinstance(module, Module)
+    assert module.name == "vpc"
+    assert module.source == "./modules/vpc"
+    assert module.arguments["cidr_block"] == Literal("10.0.0.0/16")
+    assert module.arguments["environment"] == Literal("production")
+
+
+def test_terraform_module_meta_arguments_to_ir():
+    source = """
+module "vpc" {
+  source   = "./modules/vpc"
+  count    = var.create_vpc ? 1 : 0
+  for_each = var.environments
+  depends_on = [aws_s3_bucket.data]
+}
+"""
+
+    project = parse_terraform(source)
+
+    module = project.modules[0]
+
+    assert module.count == RawExpression("var.create_vpc ? 1 : 0")
+    assert module.for_each == RawExpression("var.environments")
+    assert module.depends_on is not None

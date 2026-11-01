@@ -7,6 +7,7 @@ from iac_converter.ir import (
     CollectionExpression,
     DataSource,
     Literal,
+    Module,
     Output,
     ProjectIR,
     Provider,
@@ -57,6 +58,7 @@ def _to_ir(project: YAMLProject) -> ProjectIR:
         resources=_parse_resources(project),
         data_sources=_parse_data_sources(project),
         outputs=_parse_outputs(project),
+        modules=_parse_modules(project),
         locals=project.locals,
     )
 
@@ -161,6 +163,20 @@ def _parse_data_sources(project: YAMLProject) -> list[DataSource]:
             attributes=_convert_mapping(data_source.properties),
         )
         for data_source in project.data_sources
+    ]
+
+
+def _parse_modules(project: YAMLProject) -> list[Module]:
+    return [
+        Module(
+            name=module.name,
+            source=module.source,
+            arguments=_convert_mapping(module.arguments),
+            count=_convert_value(module.count),
+            for_each=_convert_value(module.for_each),
+            depends_on=_convert_value(module.depends_on),
+        )
+        for module in project.modules
     ]
 
 

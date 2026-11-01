@@ -14,6 +14,7 @@ from iac_converter.ir import (
     FunctionCall,
     Literal,
     LocalReference,
+    Module,
     Output,
     ProjectIR,
     Provider,
@@ -56,6 +57,8 @@ class TerraformGenerator:
 
         for output in project.outputs:
             sections.append(self._output_block(output))
+        for module in project.modules:
+            sections.append(self._module_block(module))
 
         return "\n\n".join(section for section in sections if section.strip()) + "\n"
 
@@ -273,6 +276,43 @@ class TerraformGenerator:
 
         return self._block(
             header=f'output "{output.name}"',
+            body=body,
+            level=0,
+        )
+
+    def _module_block(self, module: Module) -> str:
+        arguments: dict[str, Any] = {
+            "source": Literal(module.source),
+            **module.arguments,
+        }
+
+        body = self._render_arguments(arguments, level=1)
+
+        if module.count is not None:
+            body += "\n" + self._render_argument(
+                "count",
+                module.count,
+                level=1,
+                expression=True,
+            )
+
+        if module.for_each is not None:
+            body += "\n" + self._render_argument(
+                "for_each",
+                module.for_each,
+                level=1,
+                expression=True,
+            )
+
+        if module.depends_on:
+            body += "\n" + self._render_argument(
+                "depends_on",
+                module.depends_on,
+                level=1,
+            )
+
+        return self._block(
+            header=f'module "{module.name}"',
             body=body,
             level=0,
         )

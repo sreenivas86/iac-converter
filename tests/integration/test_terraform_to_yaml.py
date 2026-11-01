@@ -1,3 +1,4 @@
+from iac_converter.compiler.terraform_project import parse_terraform_project
 from iac_converter.generator.terraform import generate_terraform
 from iac_converter.generator.yaml import generate_yaml
 from iac_converter.ir import (
@@ -7,6 +8,7 @@ from iac_converter.ir import (
 )
 from iac_converter.parser.terraform_parser import parse_terraform
 from iac_converter.parser.yaml_parser import parse_yaml
+from iac_converter.project import Project, ProjectFile
 
 
 def test_terraform_to_yaml():
@@ -178,3 +180,76 @@ output "settings" {
     function = values["normalized_name"]
     assert isinstance(function, RawExpression)
     assert function.value == 'lower("MY-BUCKET")'
+
+
+def test_terraform_module_to_yaml():
+    source = """
+module "vpc" {
+  source      = "./modules/vpc"
+  cidr_block  = "10.0.0.0/16"
+  environment = "production"
+}
+"""
+
+    project = parse_terraform(source)
+    result = generate_yaml(project)
+
+    assert "modules:" in result
+    assert "name: vpc" in result
+    assert "source: ./modules/vpc" in result
+    assert "cidr_block: 10.0.0.0/16" in result
+    assert "environment: production" in result
+
+
+def test_terraform_module_yaml_round_trip():
+    source = """
+module "vpc" {
+  source      = "./modules/vpc"
+  cidr_block  = "10.0.0.0/16"
+  environment = "production"
+}
+"""
+
+    project1 = parse_terraform(source)
+    yaml_result = generate_yaml(project1)
+    project2 = parse_yaml(yaml_result)
+
+    assert len(project2.modules) == 1
+
+    module = project2.modules[0]
+
+    assert module.name == "vpc"
+    assert module.source == "./modules/vpc"
+    assert module.arguments["cidr_block"].value == "10.0.0.0/16"
+    assert module.arguments["environment"].value == "production"
+
+
+def test_terraform_project_merge_preserves_modules():
+    project = Project(
+        files=[
+            ProjectFile(
+                path="main.tf",
+                content="""
+module "vpc" {
+  source = "./modules/vpc"
+}
+""",
+            ),
+            ProjectFile(
+                path="modules/network.tf",
+                content="""
+module "network" {
+  source = "./modules/network"
+}
+""",
+            ),
+        ]
+    )
+
+    merged = parse_terraform_project(project)
+
+    assert len(merged.modules) == 2
+    assert merged.modules[0].name == "vpc"
+    assert merged.modules[0].source == "./modules/vpc"
+    assert merged.modules[1].name == "network"
+    assert merged.modules[1].source == "./modules/network"

@@ -7,17 +7,18 @@ from pathlib import Path
 
 from iac_converter.compiler import (
     parse_terraform_project,
+    parse_terraform_project_files,
     parse_yaml_project,
+    parse_yaml_project_files,
 )
 from iac_converter.generator import (
     generate_terraform,
     generate_terraform_project,
+    generate_terraform_project_files,
     generate_yaml_project,
+    generate_yaml_project_files,
 )
-from iac_converter.project import (
-    load_project,
-    save_project,
-)
+from iac_converter.project import load_project, save_project
 
 
 def _validate_input_file(path: Path) -> None:
@@ -84,16 +85,28 @@ def terraform_to_yaml(input_path: Path, output_path: Path) -> None:
 
 
 def yaml_project_to_terraform(input_path: Path, output_path: Path) -> None:
-    source = input_path.read_text(encoding="utf-8")
-    project_ir = parse_yaml_project(source)
-    terraform_project = generate_terraform_project(project_ir)
+    if input_path.is_file():
+        source = input_path.read_text(encoding="utf-8")
+        project_ir = parse_yaml_project(source)
+        terraform_project = generate_terraform_project(project_ir)
+    else:
+        project = load_project(input_path)
+        parsed_files = parse_yaml_project_files(project)
+        terraform_project = generate_terraform_project_files(parsed_files)
+
     save_project(terraform_project, output_path)
 
 
 def terraform_project_to_yaml(input_path: Path, output_path: Path) -> None:
     project = load_project(input_path)
-    project_ir = parse_terraform_project(project)
-    _write_file(output_path, generate_yaml_project(project_ir))
+
+    if output_path.suffix.lower() in {".yaml", ".yml"}:
+        project_ir = parse_terraform_project(project)
+        _write_file(output_path, generate_yaml_project(project_ir))
+    else:
+        parsed_files = parse_terraform_project_files(project)
+        yaml_project = generate_yaml_project_files(parsed_files)
+        save_project(yaml_project, output_path)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -128,12 +141,12 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         (
             "yaml-project-to-terraform",
-            "Convert a YAML project file to a Terraform project directory.",
+            "Convert a YAML project file or directory to a Terraform project directory.",
             "input",
         ),
         (
             "terraform-project-to-yaml",
-            "Convert a Terraform project directory to YAML.",
+            "Convert a Terraform project directory to a YAML file or project directory.",
             "input_dir",
         ),
     ]
@@ -191,16 +204,25 @@ def main(argv: list[str] | None = None) -> int:
             terraform_to_yaml(args.input_dir, args.output)
 
         elif args.command == "yaml-project-to-terraform":
-            _validate_input_file(args.input)
+            if args.input.is_file():
+                _validate_input_file(args.input)
+            else:
+                _validate_input_directory(args.input)
+
             _validate_output_directory(args.output, args.input)
             yaml_project_to_terraform(args.input, args.output)
 
         elif args.command == "terraform-project-to-yaml":
             _validate_input_directory(args.input_dir)
-            _validate_output_file_outside_directory(
-                args.output,
-                args.input_dir,
-            )
+
+            if args.output.suffix.lower() in {".yaml", ".yml"}:
+                _validate_output_file_outside_directory(
+                    args.output,
+                    args.input_dir,
+                )
+            else:
+                _validate_output_directory(args.output, args.input_dir)
+
             terraform_project_to_yaml(args.input_dir, args.output)
 
     except (OSError, ValueError) as exc:

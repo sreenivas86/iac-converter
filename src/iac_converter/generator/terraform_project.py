@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from iac_converter.generator.terraform import TerraformGenerator
-from iac_converter.ir import ProjectIR
+from iac_converter.ir import ProjectFileIR, ProjectIR
 from iac_converter.project import Project, ProjectFile
 
 
@@ -100,3 +100,40 @@ def _outputs_section(project: ProjectIR) -> ProjectIR:
         version=project.version,
         outputs=project.outputs,
     )
+
+
+def generate_terraform_project_files(
+    project_files: list[ProjectFileIR],
+) -> Project:
+    """
+    Generate Terraform files while preserving YAML project paths.
+
+    Each YAML file becomes a corresponding Terraform file.
+    """
+    generated_files: list[ProjectFile] = []
+    generator = TerraformGenerator()
+
+    for project_file in project_files:
+        path = project_file.path
+
+        if not path.lower().endswith((".yaml", ".yml")):
+            continue
+
+        terraform_path = path.rsplit(".", 1)[0] + ".tf"
+
+        content = generator.generate(project_file.project)
+
+        if content.strip():
+            generated_files.append(
+                ProjectFile(
+                    path=terraform_path,
+                    content=content,
+                )
+            )
+
+    if not generated_files:
+        raise TerraformProjectGenerationError(
+            "No Terraform files could be generated from the YAML project"
+        )
+
+    return Project(files=generated_files)

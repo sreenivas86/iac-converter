@@ -235,3 +235,179 @@ def test_cli_verbose_displays_conversion_information(
     assert "Running command: yaml-to-terraform" in captured.err
     assert f"Output written to: {output_file}" in captured.out
     assert output_file.exists()
+
+
+def test_cli_yaml_project_directory_to_terraform(tmp_path: Path) -> None:
+    input_dir = tmp_path / "yaml-project"
+    input_dir.mkdir()
+
+    (input_dir / "provider.yaml").write_text(
+        """
+version: "1"
+
+providers:
+  aws:
+    properties:
+      region: ap-south-1
+""",
+        encoding="utf-8",
+    )
+
+    (input_dir / "s3.yaml").write_text(
+        """
+version: "1"
+
+resources:
+  - type: aws_s3_bucket
+    name: data
+    properties:
+      bucket: company-data
+""",
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "terraform"
+
+    result = main(
+        [
+            "yaml-project-to-terraform",
+            str(input_dir),
+            "--output",
+            str(output_dir),
+        ]
+    )
+
+    assert result == 0
+    assert (output_dir / "provider.tf").exists()
+    assert (output_dir / "s3.tf").exists()
+
+    provider_content = (output_dir / "provider.tf").read_text(encoding="utf-8")
+    resource_content = (output_dir / "s3.tf").read_text(encoding="utf-8")
+
+    assert 'provider "aws"' in provider_content
+    assert 'resource "aws_s3_bucket" "data"' in resource_content
+
+
+def test_cli_yaml_project_directory_preserves_nested_paths(
+    tmp_path: Path,
+) -> None:
+    input_dir = tmp_path / "yaml-project"
+    resources_dir = input_dir / "resources"
+    resources_dir.mkdir(parents=True)
+
+    (resources_dir / "s3.yaml").write_text(
+        """
+version: "1"
+
+resources:
+  - type: aws_s3_bucket
+    name: data
+    properties:
+      bucket: company-data
+""",
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "terraform"
+
+    result = main(
+        [
+            "yaml-project-to-terraform",
+            str(input_dir),
+            "--output",
+            str(output_dir),
+        ]
+    )
+
+    assert result == 0
+
+    generated_file = output_dir / "resources" / "s3.tf"
+    assert generated_file.exists()
+
+    content = generated_file.read_text(encoding="utf-8")
+    assert 'resource "aws_s3_bucket" "data"' in content
+
+
+def test_cli_terraform_project_to_yaml_directory(tmp_path: Path) -> None:
+    input_dir = tmp_path / "terraform"
+    resources_dir = input_dir / "resources"
+    resources_dir.mkdir(parents=True)
+
+    (input_dir / "providers.tf").write_text(
+        """
+provider "aws" {
+  region = "ap-south-1"
+}
+""",
+        encoding="utf-8",
+    )
+
+    (resources_dir / "s3.tf").write_text(
+        """
+resource "aws_s3_bucket" "data" {
+  bucket = "company-data"
+}
+""",
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "yaml-project"
+
+    result = main(
+        [
+            "terraform-project-to-yaml",
+            str(input_dir),
+            "--output",
+            str(output_dir),
+        ]
+    )
+
+    assert result == 0
+    assert (output_dir / "providers.yaml").exists()
+    assert (output_dir / "resources" / "s3.yaml").exists()
+
+    provider_content = (output_dir / "providers.yaml").read_text(encoding="utf-8")
+    resource_content = (output_dir / "resources" / "s3.yaml").read_text(encoding="utf-8")
+
+    assert "providers:" in provider_content
+    assert "aws_s3_bucket" in resource_content
+    assert "company-data" in resource_content
+
+
+def test_cli_terraform_project_to_yaml_directory_preserves_files(
+    tmp_path: Path,
+) -> None:
+    input_dir = tmp_path / "terraform"
+    input_dir.mkdir()
+
+    for filename, bucket in [
+        ("first.tf", "company-data"),
+        ("second.tf", "company-logs"),
+    ]:
+        (input_dir / filename).write_text(
+            f"""
+resource "aws_s3_bucket" "{filename.split(".")[0]}" {{
+  bucket = "{bucket}"
+}}
+""",
+            encoding="utf-8",
+        )
+
+    output_dir = tmp_path / "yaml-project"
+
+    result = main(
+        [
+            "terraform-project-to-yaml",
+            str(input_dir),
+            "--output",
+            str(output_dir),
+        ]
+    )
+
+    assert result == 0
+    assert (output_dir / "first.yaml").exists()
+    assert (output_dir / "second.yaml").exists()
+
+    assert "company-data" in (output_dir / "first.yaml").read_text(encoding="utf-8")
+
+    assert "company-logs" in (output_dir / "second.yaml").read_text(encoding="utf-8")

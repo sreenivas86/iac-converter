@@ -9,6 +9,7 @@ from iac_converter.ir import (
     CollectionExpression,
     DataSource,
     Literal,
+    Module,
     Output,
     ProjectIR,
     Provider,
@@ -58,6 +59,8 @@ class YAMLGenerator:
 
         if project.outputs:
             document["outputs"] = [self._generate_output(output) for output in project.outputs]
+        if project.modules:
+            document["modules"] = [self._generate_module(module) for module in project.modules]
 
         # Remove parser-specific metadata immediately before serialization.
         document = self._clean_internal_markers(document)
@@ -213,6 +216,29 @@ class YAMLGenerator:
 
         if output.depends_on:
             result["depends_on"] = self._convert_value(output.depends_on)
+
+        return result
+
+        # ---------------------------------------------------------------
+
+    # Modules
+    # ---------------------------------------------------------------
+
+    def _generate_module(self, module: Module) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "name": module.name,
+            "source": module.source,
+            "arguments": self._convert_value(module.arguments),
+        }
+
+        if module.count is not None:
+            result["count"] = self._convert_value(module.count)
+
+        if module.for_each is not None:
+            result["for_each"] = self._convert_value(module.for_each)
+
+        if module.depends_on:
+            result["depends_on"] = self._convert_value(module.depends_on)
 
         return result
 

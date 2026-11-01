@@ -10,7 +10,9 @@ from .expression import (
     RawExpression,
 )
 from .model import ProjectIR
+from .module import Module
 from .output import Output
+from .project_file import ProjectFileIR
 from .provider import Provider
 from .reference import (
     DataSourceReference,
@@ -34,7 +36,9 @@ __all__ = [
     "FunctionCall",
     "Literal",
     "LocalReference",
+    "Module",
     "Output",
+    "ProjectFileIR",
     "ProjectIR",
     "Provider",
     "RawExpression",
