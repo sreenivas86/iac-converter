@@ -1,4 +1,5 @@
 from iac_converter.generator.terraform import generate_terraform
+from iac_converter.ir import ModuleReference
 from iac_converter.parser.yaml_parser import parse_yaml
 
 
@@ -159,3 +160,50 @@ modules:
     assert 'source = "./modules/vpc"' in terraform
     assert "count = var.create_vpc ? 1 : 0" in terraform
     assert "depends_on = [aws_s3_bucket.data]" in terraform
+
+
+def test_yaml_module_output_reference_to_ir():
+    source = """
+modules:
+  - name: vpc
+    source: ./modules/vpc
+
+outputs:
+  - name: vpc_id
+    value:
+      module_reference:
+        module_name: vpc
+        output_name: vpc_id
+"""
+
+    project = parse_yaml(source)
+
+    assert len(project.outputs) == 1
+
+    reference = project.outputs[0].value
+
+    assert isinstance(reference, ModuleReference)
+    assert reference.module_name == "vpc"
+    assert reference.output_name == "vpc_id"
+    assert reference.to_string() == "module.vpc.vpc_id"
+
+
+def test_yaml_module_output_reference_to_terraform():
+    source = """
+modules:
+  - name: vpc
+    source: ./modules/vpc
+
+outputs:
+  - name: vpc_id
+    value:
+      module_reference:
+        module_name: vpc
+        output_name: vpc_id
+"""
+
+    project = parse_yaml(source)
+    result = generate_terraform(project)
+
+    assert 'module "vpc" {' in result
+    assert "value = module.vpc.vpc_id" in result

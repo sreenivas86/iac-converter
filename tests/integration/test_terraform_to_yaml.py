@@ -1,11 +1,7 @@
 from iac_converter.compiler.terraform_project import parse_terraform_project
 from iac_converter.generator.terraform import generate_terraform
 from iac_converter.generator.yaml import generate_yaml
-from iac_converter.ir import (
-    CollectionExpression,
-    RawExpression,
-    Reference,
-)
+from iac_converter.ir import CollectionExpression, ModuleReference, RawExpression, Reference
 from iac_converter.parser.terraform_parser import parse_terraform
 from iac_converter.parser.yaml_parser import parse_yaml
 from iac_converter.project import Project, ProjectFile
@@ -253,3 +249,29 @@ module "network" {
     assert merged.modules[0].source == "./modules/vpc"
     assert merged.modules[1].name == "network"
     assert merged.modules[1].source == "./modules/network"
+
+
+def test_terraform_module_output_reference_yaml_round_trip():
+    source = """
+module "vpc" {
+  source = "./modules/vpc"
+}
+
+output "vpc_id" {
+  value = module.vpc.vpc_id
+}
+"""
+
+    project1 = parse_terraform(source)
+    yaml_result = generate_yaml(project1)
+
+    assert "module_reference:" in yaml_result
+    assert "module_name: vpc" in yaml_result
+    assert "output_name: vpc_id" in yaml_result
+
+    project2 = parse_yaml(yaml_result)
+
+    reference = project2.outputs[0].value
+
+    assert isinstance(reference, ModuleReference)
+    assert reference.to_string() == "module.vpc.vpc_id"

@@ -10,6 +10,7 @@ from iac_converter.ir import (
     DataSource,
     Literal,
     Module,
+    ModuleReference,
     Output,
     ProjectIR,
     Provider,
@@ -472,7 +473,7 @@ def _extract_expression(
 
 def _parse_reference(
     expression: str,
-) -> Reference | None:
+) -> Reference | ModuleReference | None:
     """Parse simple Terraform resource/data references.
 
     Supported:
@@ -496,6 +497,14 @@ def _parse_reference(
         return None
 
     parts = expression.split(".")
+    # Terraform module output reference: module.vpc.vpc_id
+    if len(parts) == 3 and parts[0] == "module":
+        if all(parts[1:]):
+            return ModuleReference(
+                module_name=parts[1],
+                output_name=parts[2],
+            )
+        return None
 
     if len(parts) not in (2, 3):
         return None

@@ -440,3 +440,32 @@ variables:
     assert 'source = "./modules/vpc"' in files["main.tf"]
     assert 'resource "aws_vpc" "main"' in files["modules/vpc/main.tf"]
     assert 'variable "cidr_block"' in files["modules/vpc/variables.tf"]
+
+
+def test_terraform_project_files_preserves_module_output_references() -> None:
+    terraform_project = Project(
+        files=[
+            ProjectFile(
+                path="main.tf",
+                content="""
+module "vpc" {
+  source = "./modules/vpc"
+}
+
+output "vpc_id" {
+  value = module.vpc.vpc_id
+}
+""",
+            ),
+        ]
+    )
+
+    parsed_files = parse_terraform_project_files(terraform_project)
+    result = generate_yaml_project_files(parsed_files)
+
+    files = {item.path: item.content for item in result.files}
+
+    assert "main.yaml" in files
+    assert "module_reference:" in files["main.yaml"]
+    assert "module_name: vpc" in files["main.yaml"]
+    assert "output_name: vpc_id" in files["main.yaml"]

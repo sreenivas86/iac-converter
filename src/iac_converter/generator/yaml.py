@@ -10,6 +10,7 @@ from iac_converter.ir import (
     DataSource,
     Literal,
     Module,
+    ModuleReference,
     Output,
     ProjectIR,
     Provider,
@@ -256,6 +257,14 @@ class YAMLGenerator:
                     "resource_type": value.resource_type,
                     "resource_name": value.resource_name,
                     **({"attribute": value.attribute} if value.attribute is not None else {}),
+                }
+            }
+
+        if isinstance(value, ModuleReference):
+            return {
+                "module_reference": {
+                    "module_name": value.module_name,
+                    "output_name": value.output_name,
                 }
             }
 

@@ -8,6 +8,7 @@ from iac_converter.ir import (
     DataSource,
     Literal,
     Module,
+    ModuleReference,
     Output,
     ProjectIR,
     Provider,
@@ -221,6 +222,26 @@ def _convert_value(value: Any) -> Any:
                 resource_type=reference["resource_type"],
                 resource_name=reference["resource_name"],
                 attribute=reference.get("attribute"),
+            )
+
+        if set(value.keys()) == {"module_reference"}:
+            reference = value["module_reference"]
+
+            if not isinstance(reference, dict):
+                raise YAMLParseError("'module_reference' must be an object")
+
+            module_name = reference.get("module_name")
+            output_name = reference.get("output_name")
+
+            if not isinstance(module_name, str) or not module_name.strip():
+                raise YAMLParseError("'module_name' must be a non-empty string")
+
+            if not isinstance(output_name, str) or not output_name.strip():
+                raise YAMLParseError("'output_name' must be a non-empty string")
+
+            return ModuleReference(
+                module_name=module_name,
+                output_name=output_name,
             )
 
         return CollectionExpression(

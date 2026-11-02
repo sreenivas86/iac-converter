@@ -18,6 +18,7 @@ from .reference import (
     DataSourceReference,
     ForVariableReference,
     LocalReference,
+    ModuleReference,
     Reference,
     VariableReference,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "Literal",
     "LocalReference",
     "Module",
+    "ModuleReference",
     "Output",
     "ProjectFileIR",
     "ProjectIR",

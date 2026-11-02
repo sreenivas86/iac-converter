@@ -79,6 +79,22 @@ class LocalReference(Expression):
 
 
 @dataclass(frozen=True)
+class ModuleReference(Expression):
+    """
+    Reference to a Terraform module output.
+
+    Example:
+        module.vpc.vpc_id
+    """
+
+    module_name: str
+    output_name: str
+
+    def to_string(self) -> str:
+        return f"module.{self.module_name}.{self.output_name}"
+
+
+@dataclass(frozen=True)
 class ForVariableReference(Expression):
     """Reference to a Terraform for-expression iteration variable."""
 

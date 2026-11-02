@@ -1,6 +1,7 @@
 from iac_converter.ir import (
     Literal,
     Module,
+    ModuleReference,
     RawExpression,
     Reference,
 )
@@ -156,3 +157,27 @@ module "vpc" {
     assert module.count == RawExpression("var.create_vpc ? 1 : 0")
     assert module.for_each == RawExpression("var.environments")
     assert module.depends_on is not None
+
+
+def test_terraform_module_output_reference_to_ir():
+    source = """
+module "vpc" {
+  source = "./modules/vpc"
+}
+
+output "vpc_id" {
+  value = module.vpc.vpc_id
+}
+"""
+
+    project = parse_terraform(source)
+
+    assert len(project.modules) == 1
+    assert len(project.outputs) == 1
+
+    reference = project.outputs[0].value
+
+    assert isinstance(reference, ModuleReference)
+    assert reference.module_name == "vpc"
+    assert reference.output_name == "vpc_id"
+    assert reference.to_string() == "module.vpc.vpc_id"

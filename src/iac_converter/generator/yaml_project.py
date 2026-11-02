@@ -6,6 +6,7 @@ import yaml
 
 from iac_converter.ir import (
     Literal,
+    ModuleReference,
     ProjectFileIR,
     ProjectIR,
     RawExpression,
@@ -248,6 +249,13 @@ def _convert_value(value: Any) -> Any:
             result["reference"]["attribute"] = value.attribute
 
         return result
+    if isinstance(value, ModuleReference):
+        return {
+            "module_reference": {
+                "module_name": value.module_name,
+                "output_name": value.output_name,
+            }
+        }
 
     if isinstance(value, RawExpression):
         return {

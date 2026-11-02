@@ -15,6 +15,7 @@ from iac_converter.ir import (
     Literal,
     LocalReference,
     Module,
+    ModuleReference,
     Output,
     ProjectIR,
     Provider,
@@ -535,6 +536,7 @@ class TerraformGenerator:
                 VariableReference,
                 LocalReference,
                 ForVariableReference,
+                ModuleReference,
             ),
         ):
             return value.to_string()
