@@ -1,4 +1,6 @@
 from pathlib import Path
+from subprocess import CompletedProcess
+from unittest.mock import patch
 
 from iac_converter.cli import main
 
@@ -411,3 +413,161 @@ resource "aws_s3_bucket" "{filename.split(".")[0]}" {{
     assert "company-data" in (output_dir / "first.yaml").read_text(encoding="utf-8")
 
     assert "company-logs" in (output_dir / "second.yaml").read_text(encoding="utf-8")
+
+
+def test_cli_validate_terraform(tmp_path: Path, capsys) -> None:
+    with (
+        patch(
+            "iac_converter.validation.engine.shutil.which",
+            return_value="terraform",
+        ),
+        patch(
+            "iac_converter.validation.engine._run_command",
+            side_effect=[
+                CompletedProcess([], 0, "Initialized", ""),
+                CompletedProcess([], 0, "Success!", ""),
+            ],
+        ) as mock_run,
+    ):
+        result = main(["validate", str(tmp_path), "--tool", "terraform"])
+
+    assert result == 0
+    assert mock_run.call_count == 2
+    assert "validation completed successfully" in capsys.readouterr().out
+
+
+def test_cli_validate_opentofu(tmp_path: Path, capsys) -> None:
+    with (
+        patch(
+            "iac_converter.validation.engine.shutil.which",
+            return_value="tofu",
+        ),
+        patch(
+            "iac_converter.validation.engine._run_command",
+            side_effect=[
+                CompletedProcess([], 0, "Initialized", ""),
+                CompletedProcess([], 0, "Success!", ""),
+            ],
+        ) as mock_run,
+    ):
+        result = main(["validate", str(tmp_path), "--tool", "tofu"])
+
+    assert result == 0
+    assert mock_run.call_count == 2
+    assert "tofu" in capsys.readouterr().out
+
+
+def test_cli_validate_auto(tmp_path: Path) -> None:
+    with (
+        patch(
+            "iac_converter.validation.engine.shutil.which",
+            side_effect=["terraform", "tofu"],
+        ),
+        patch(
+            "iac_converter.validation.engine._run_command",
+            side_effect=[
+                CompletedProcess([], 0, "Initialized", ""),
+                CompletedProcess([], 0, "Success!", ""),
+            ],
+        ) as mock_run,
+    ):
+        result = main(["validate", str(tmp_path), "--tool", "auto"])
+
+    assert result == 0
+    assert mock_run.call_count == 2
+    assert mock_run.call_args_list[0].args[0][0] == "terraform"
+
+
+def test_cli_validate_missing_tool(tmp_path: Path, capsys) -> None:
+    with patch(
+        "iac_converter.validation.engine.shutil.which",
+        return_value=None,
+    ):
+        result = main(["validate", str(tmp_path), "--tool", "tofu"])
+
+    assert result == 1
+    assert "tofu CLI was not found" in capsys.readouterr().err
+
+
+def test_cli_validate_failed_configuration(tmp_path: Path, capsys) -> None:
+    with (
+        patch(
+            "iac_converter.validation.engine.shutil.which",
+            return_value="terraform",
+        ),
+        patch(
+            "iac_converter.validation.engine._run_command",
+            side_effect=[
+                CompletedProcess([], 0, "Initialized", ""),
+                CompletedProcess([], 1, "", "Invalid configuration"),
+            ],
+        ),
+    ):
+        result = main(["validate", str(tmp_path), "--tool", "terraform"])
+
+    assert result == 1
+    assert "Invalid configuration" in capsys.readouterr().err
+
+
+def test_cli_validate_skip_init_and_check_format(
+    tmp_path: Path,
+) -> None:
+    with (
+        patch(
+            "iac_converter.validation.engine.shutil.which",
+            return_value="tofu",
+        ),
+        patch(
+            "iac_converter.validation.engine._run_command",
+            side_effect=[
+                CompletedProcess([], 0, "Success!", ""),
+                CompletedProcess([], 0, "", ""),
+            ],
+        ) as mock_run,
+    ):
+        result = main(
+            [
+                "validate",
+                str(tmp_path),
+                "--tool",
+                "tofu",
+                "--skip-init",
+                "--check-format",
+            ]
+        )
+
+    assert result == 0
+    assert mock_run.call_count == 2
+    assert mock_run.call_args_list[0].args[0][1] == "validate"
+    assert mock_run.call_args_list[1].args[0][1] == "fmt"
+
+
+def test_cli_validate_quiet(tmp_path: Path, capsys) -> None:
+    with (
+        patch(
+            "iac_converter.validation.engine.shutil.which",
+            return_value="terraform",
+        ),
+        patch(
+            "iac_converter.validation.engine._run_command",
+            side_effect=[
+                CompletedProcess([], 0, "", ""),
+                CompletedProcess([], 0, "", ""),
+            ],
+        ),
+    ):
+        result = main(
+            [
+                "validate",
+                str(tmp_path),
+                "--tool",
+                "terraform",
+                "--quiet",
+            ]
+        )
+
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert captured.out == ""
+    assert captured.err == ""

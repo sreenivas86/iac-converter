@@ -19,6 +19,11 @@ from iac_converter.generator import (
     generate_yaml_project,
 )
 from iac_converter.project import load_project, save_project
+from iac_converter.validation import (
+    ValidationError,
+    ValidationTool,
+    validate_project,
+)
 
 
 def _validate_input_file(path: Path) -> None:
@@ -109,6 +114,48 @@ def terraform_project_to_yaml(input_path: Path, output_path: Path) -> None:
         save_project(yaml_project, output_path)
 
 
+def _run_validation(
+    project_directory: Path,
+    tool: str,
+    *,
+    skip_init: bool,
+    check_format: bool,
+    verbose: bool,
+    quiet: bool = False,
+) -> bool:
+    results = validate_project(
+        project_directory,
+        ValidationTool(tool),
+        skip_init=skip_init,
+        check_format=check_format,
+    )
+
+    for result in results:
+        if not result.success:
+            print(
+                f"[FAILED] {result.tool}: {' '.join(result.command[1:])}",
+                file=sys.stderr,
+            )
+            if result.message.strip():
+                print(result.message.rstrip(), file=sys.stderr)
+            print("Infrastructure validation failed.", file=sys.stderr)
+            return False
+
+        if not quiet:
+            print(f"[PASSED] {result.tool}: {' '.join(result.command[1:])}")
+
+            if result.message.strip():
+                print(result.message.rstrip())
+
+            if verbose:
+                print(f"Exit code: {result.return_code}")
+
+    if not quiet:
+        print("Infrastructure validation completed successfully.")
+
+    return True
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="iac-converter",
@@ -179,6 +226,44 @@ def build_parser() -> argparse.ArgumentParser:
             help="Suppress successful conversion messages.",
         )
 
+    validation_parser = subparsers.add_parser(
+        "validate",
+        help="Validate a Terraform or OpenTofu project.",
+        description="Initialize and validate a Terraform or OpenTofu project.",
+    )
+    validation_parser.add_argument(
+        "project_directory",
+        type=Path,
+        help="Terraform or OpenTofu project directory.",
+    )
+    validation_parser.add_argument(
+        "--tool",
+        choices=[tool.value for tool in ValidationTool],
+        default=ValidationTool.AUTO.value,
+        help="Validation tool: terraform, tofu, or auto (default: auto).",
+    )
+    validation_parser.add_argument(
+        "--skip-init",
+        action="store_true",
+        help="Skip terraform/tofu init.",
+    )
+    validation_parser.add_argument(
+        "--check-format",
+        action="store_true",
+        help="Check recursive formatting without modifying files.",
+    )
+    validation_verbosity = validation_parser.add_mutually_exclusive_group()
+    validation_verbosity.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show detailed validation information.",
+    )
+    validation_verbosity.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress successful validation messages.",
+    )
+
     return parser
 
 
@@ -225,7 +310,21 @@ def main(argv: list[str] | None = None) -> int:
 
             terraform_project_to_yaml(args.input_dir, args.output)
 
-    except (OSError, ValueError) as exc:
+        elif args.command == "validate":
+            _validate_input_directory(args.project_directory)
+
+            success = _run_validation(
+                args.project_directory,
+                args.tool,
+                skip_init=args.skip_init,
+                check_format=args.check_format,
+                verbose=args.verbose,
+                quiet=args.quiet,
+            )
+
+            return 0 if success else 1
+
+    except (OSError, ValueError, ValidationError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
