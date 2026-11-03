@@ -181,3 +181,16 @@ output "vpc_id" {
     assert reference.module_name == "vpc"
     assert reference.output_name == "vpc_id"
     assert reference.to_string() == "module.vpc.vpc_id"
+
+
+def test_terraform_import_block_generates_warning_diagnostic():
+    source = """
+import {
+  to = aws_s3_bucket.example
+  id = "existing-bucket-id"
+}
+"""
+
+    project = parse_terraform(source)
+
+    assert project is not None

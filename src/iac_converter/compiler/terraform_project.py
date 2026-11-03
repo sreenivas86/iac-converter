@@ -42,7 +42,10 @@ def parse_terraform_project_files(project: Project) -> list[ProjectFileIR]:
 
     for project_file in terraform_files:
         try:
-            parsed = parse_terraform(project_file.content)
+            parsed = parse_terraform(
+                project_file.content,
+                file_path=project_file.path,
+            )
         except TerraformParseError as exc:
             raise TerraformProjectParseError(
                 f"Failed to parse Terraform file '{project_file.path}': {exc}"
@@ -154,5 +157,6 @@ def _merge_project_ir(target: ProjectIR, source: ProjectIR) -> None:
     target.data_sources.extend(source.data_sources)
     target.outputs.extend(source.outputs)
     target.modules.extend(source.modules)
+    target.diagnostics.extend(source.diagnostics)
     target.locals.update(source.locals)
     target.terraform.update(source.terraform)

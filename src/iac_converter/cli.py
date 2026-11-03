@@ -18,6 +18,7 @@ from iac_converter.generator import (
     generate_yaml_module_project,
     generate_yaml_project,
 )
+from iac_converter.ir import ModuleProjectIR, ProjectIR
 from iac_converter.project import load_project, save_project
 from iac_converter.validation import (
     ValidationError,
@@ -77,19 +78,76 @@ def _write_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def _display_diagnostics(
+    project_ir: ProjectIR,
+    *,
+    quiet: bool = False,
+) -> None:
+    for diagnostic in project_ir.diagnostics:
+        severity = diagnostic.severity.value.upper()
+        location = ""
+
+        if diagnostic.file_path:
+            location = diagnostic.file_path
+
+            if diagnostic.line is not None:
+                location += f":{diagnostic.line}"
+
+                if diagnostic.column is not None:
+                    location += f":{diagnostic.column}"
+
+            location += ": "
+
+        print(
+            f"[{severity}] {diagnostic.code}: {location}{diagnostic.message}",
+            file=sys.stderr,
+        )
+
+        if diagnostic.suggestion and not quiet:
+            print(
+                f"  Suggestion: {diagnostic.suggestion}",
+                file=sys.stderr,
+            )
+
+
+def _display_module_diagnostics(
+    module_ir: ModuleProjectIR,
+    *,
+    quiet: bool = False,
+) -> None:
+    _display_diagnostics(module_ir.project, quiet=quiet)
+
+    for project_file in module_ir.files:
+        _display_diagnostics(project_file.project, quiet=quiet)
+
+    for child_module in module_ir.child_modules:
+        _display_module_diagnostics(child_module, quiet=quiet)
+
+
 def yaml_to_terraform(input_path: Path, output_path: Path) -> None:
     source = input_path.read_text(encoding="utf-8")
     project_ir = parse_yaml_project(source)
     _write_file(output_path, generate_terraform(project_ir))
 
 
-def terraform_to_yaml(input_path: Path, output_path: Path) -> None:
+def terraform_to_yaml(
+    input_path: Path,
+    output_path: Path,
+    *,
+    quiet: bool = False,
+) -> None:
     project = load_project(input_path)
     project_ir = parse_terraform_project(project)
+
+    _display_diagnostics(project_ir, quiet=quiet)
+
     _write_file(output_path, generate_yaml_project(project_ir))
 
 
-def yaml_project_to_terraform(input_path: Path, output_path: Path) -> None:
+def yaml_project_to_terraform(
+    input_path: Path,
+    output_path: Path,
+) -> None:
     if input_path.is_file():
         source = input_path.read_text(encoding="utf-8")
         project_ir = parse_yaml_project(source)
@@ -102,14 +160,25 @@ def yaml_project_to_terraform(input_path: Path, output_path: Path) -> None:
     save_project(terraform_project, output_path)
 
 
-def terraform_project_to_yaml(input_path: Path, output_path: Path) -> None:
+def terraform_project_to_yaml(
+    input_path: Path,
+    output_path: Path,
+    *,
+    quiet: bool = False,
+) -> None:
     project = load_project(input_path)
 
     if output_path.suffix.lower() in {".yaml", ".yml"}:
         project_ir = parse_terraform_project(project)
+
+        _display_diagnostics(project_ir, quiet=quiet)
+
         _write_file(output_path, generate_yaml_project(project_ir))
     else:
         module_ir = parse_terraform_module_project(project)
+
+        _display_module_diagnostics(module_ir, quiet=quiet)
+
         yaml_project = generate_yaml_module_project(module_ir)
         save_project(yaml_project, output_path)
 
@@ -136,8 +205,10 @@ def _run_validation(
                 f"[FAILED] {result.tool}: {' '.join(result.command[1:])}",
                 file=sys.stderr,
             )
+
             if result.message.strip():
                 print(result.message.rstrip(), file=sys.stderr)
+
             print("Infrastructure validation failed.", file=sys.stderr)
             return False
 
@@ -200,11 +271,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     for name, description, input_name in commands:
         command_parser = subparsers.add_parser(name, help=description)
+
         command_parser.add_argument(
             input_name,
             type=Path,
             help="Input path.",
         )
+
         command_parser.add_argument(
             "-o",
             "--output",
@@ -215,11 +288,13 @@ def build_parser() -> argparse.ArgumentParser:
         )
 
         verbosity = command_parser.add_mutually_exclusive_group()
+
         verbosity.add_argument(
             "--verbose",
             action="store_true",
             help="Show detailed conversion information.",
         )
+
         verbosity.add_argument(
             "--quiet",
             action="store_true",
@@ -231,33 +306,40 @@ def build_parser() -> argparse.ArgumentParser:
         help="Validate a Terraform or OpenTofu project.",
         description="Initialize and validate a Terraform or OpenTofu project.",
     )
+
     validation_parser.add_argument(
         "project_directory",
         type=Path,
         help="Terraform or OpenTofu project directory.",
     )
+
     validation_parser.add_argument(
         "--tool",
         choices=[tool.value for tool in ValidationTool],
         default=ValidationTool.AUTO.value,
         help="Validation tool: terraform, tofu, or auto (default: auto).",
     )
+
     validation_parser.add_argument(
         "--skip-init",
         action="store_true",
         help="Skip terraform/tofu init.",
     )
+
     validation_parser.add_argument(
         "--check-format",
         action="store_true",
         help="Check recursive formatting without modifying files.",
     )
+
     validation_verbosity = validation_parser.add_mutually_exclusive_group()
+
     validation_verbosity.add_argument(
         "--verbose",
         action="store_true",
         help="Show detailed validation information.",
     )
+
     validation_verbosity.add_argument(
         "--quiet",
         action="store_true",
@@ -282,11 +364,17 @@ def main(argv: list[str] | None = None) -> int:
 
         elif args.command == "terraform-to-yaml":
             _validate_input_directory(args.input_dir)
+
             _validate_output_file_outside_directory(
                 args.output,
                 args.input_dir,
             )
-            terraform_to_yaml(args.input_dir, args.output)
+
+            terraform_to_yaml(
+                args.input_dir,
+                args.output,
+                quiet=args.quiet,
+            )
 
         elif args.command == "yaml-project-to-terraform":
             if args.input.is_file():
@@ -295,6 +383,7 @@ def main(argv: list[str] | None = None) -> int:
                 _validate_input_directory(args.input)
 
             _validate_output_directory(args.output, args.input)
+
             yaml_project_to_terraform(args.input, args.output)
 
         elif args.command == "terraform-project-to-yaml":
@@ -308,7 +397,11 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 _validate_output_directory(args.output, args.input_dir)
 
-            terraform_project_to_yaml(args.input_dir, args.output)
+            terraform_project_to_yaml(
+                args.input_dir,
+                args.output,
+                quiet=args.quiet,
+            )
 
         elif args.command == "validate":
             _validate_input_directory(args.project_directory)

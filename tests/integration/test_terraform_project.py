@@ -1,3 +1,6 @@
+import pytest
+
+from iac_converter.compiler import parse_terraform_project_files
 from iac_converter.compiler.terraform_project import (
     TerraformProjectParseError,
     parse_terraform_module_project,
@@ -305,3 +308,53 @@ resource "aws_subnet" "main" {
     assert subnet.path == "modules/network/modules/subnet"
     assert len(subnet.project.resources) == 1
     assert subnet.project.resources[0].type == "aws_subnet"
+
+
+def test_parse_terraform_project_preserves_source_diagnostic():
+    from iac_converter.project import Project
+    from iac_converter.project.project import ProjectFile
+
+    project = Project(
+        files=[
+            ProjectFile(
+                path="modules/vpc/main.tf",
+                content="resource {\n",
+            )
+        ]
+    )
+
+    with pytest.raises(TerraformProjectParseError) as exc_info:
+        parse_terraform_project_files(project)
+
+    diagnostic = exc_info.value.__cause__.diagnostic
+
+    assert diagnostic.code == "TF001"
+    assert diagnostic.file_path == "modules/vpc/main.tf"
+    assert diagnostic.line == 2
+    assert diagnostic.column == 1
+
+
+def test_terraform_project_merge_preserves_import_diagnostics():
+    project = Project(
+        files=[
+            ProjectFile(
+                path="main.tf",
+                content='resource "aws_s3_bucket" "example" {\n  bucket = "example"\n}\n',
+            ),
+            ProjectFile(
+                path="modules/storage/import.tf",
+                content=(
+                    'import {\n  to = aws_s3_bucket.example\n  id = "existing-bucket-id"\n}\n'
+                ),
+            ),
+        ]
+    )
+
+    parsed = parse_terraform_project(project)
+
+    assert len(parsed.diagnostics) == 1
+
+    diagnostic = parsed.diagnostics[0]
+
+    assert diagnostic.code == "TF002"
+    assert diagnostic.file_path == "modules/storage/import.tf"

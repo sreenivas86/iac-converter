@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from iac_converter.diagnostics import Diagnostic
+
 from .data_source import DataSource
 from .module import Module
 from .output import Output
@@ -36,3 +38,5 @@ class ProjectIR:
     locals: dict[str, Any] = field(default_factory=dict)
 
     terraform: dict[str, Any] = field(default_factory=dict)
+
+    diagnostics: list[Diagnostic] = field(default_factory=list)

@@ -5,6 +5,7 @@ from typing import Any
 
 import hcl2
 
+from iac_converter.diagnostics import Diagnostic, DiagnosticSeverity
 from iac_converter.ir import (
     Block,
     DataSource,
@@ -24,20 +25,78 @@ from iac_converter.ir import (
 class TerraformParseError(ValueError):
     """Raised when Terraform configuration cannot be parsed."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        diagnostic: Diagnostic | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.diagnostic = diagnostic
 
-def parse_terraform(source: str) -> ProjectIR:
+
+def parse_terraform(
+    source: str,
+    *,
+    file_path: str | None = None,
+) -> ProjectIR:
     try:
         document = hcl2.load(io.StringIO(source))
     except Exception as exc:
-        raise TerraformParseError(f"Invalid Terraform configuration: {exc}") from exc
+        line = getattr(exc, "line", None)
+        column = getattr(exc, "column", None)
+
+        diagnostic = Diagnostic(
+            code="TF001",
+            severity=DiagnosticSeverity.ERROR,
+            message="Invalid Terraform configuration.",
+            line=line,
+            column=column,
+            suggestion="Check the Terraform syntax near the reported location.",
+            file_path=file_path,
+        )
+
+        message = f"Invalid Terraform configuration: {exc}"
+
+        if line is not None and column is not None:
+            message += f" (line {line}, column {column})"
+
+        raise TerraformParseError(
+            message,
+            diagnostic=diagnostic,
+        ) from exc
 
     if not isinstance(document, dict):
         raise TerraformParseError("Invalid Terraform configuration: expected a dictionary.")
 
-    return _to_ir(document)
+    return _to_ir(document, file_path=file_path)
 
 
-def _to_ir(document: dict[str, Any]) -> ProjectIR:
+def _to_ir(
+    document: dict[str, Any],
+    *,
+    file_path: str | None = None,
+) -> ProjectIR:
+    diagnostics: list[Diagnostic] = []
+
+    if document.get("import"):
+        diagnostics.append(
+            Diagnostic(
+                code="TF002",
+                severity=DiagnosticSeverity.WARNING,
+                message=(
+                    "Terraform import blocks are not yet supported "
+                    "and will not be preserved during conversion."
+                ),
+                file_path=file_path,
+                suggestion=(
+                    "Preserve the import block manually or use a "
+                    "Terraform version of the configuration that "
+                    "does not rely on import blocks."
+                ),
+            )
+        )
+
     return ProjectIR(
         version="1",
         terraform=_parse_terraform_block(document),
@@ -48,6 +107,7 @@ def _to_ir(document: dict[str, Any]) -> ProjectIR:
         outputs=_parse_outputs(document),
         modules=_parse_modules(document),
         locals=_parse_locals(document),
+        diagnostics=diagnostics,
     )
 
 
