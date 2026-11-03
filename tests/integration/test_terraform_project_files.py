@@ -848,3 +848,96 @@ def test_generate_terraform_module_project_rejects_empty_project() -> None:
         match="No Terraform files could be generated",
     ):
         generate_terraform_module_project(ModuleProjectIR(path=""))
+
+
+def test_module_project_round_trip_preserves_configuration_values():
+    yaml_project = Project(
+        files=[
+            ProjectFile(
+                path="main.yaml",
+                content="""
+version: "1"
+modules:
+  - name: vpc
+    source: ./modules/vpc
+    arguments:
+      cidr_block: "10.0.0.0/16"
+""",
+            ),
+            ProjectFile(
+                path="modules/vpc/main.yaml",
+                content="""
+version: "1"
+variables:
+  - name: cidr_block
+    type: string
+    default: "10.0.0.0/16"
+resources:
+  - type: aws_vpc
+    name: main
+    properties:
+      cidr_block:
+        expression: var.cidr_block
+outputs:
+  - name: vpc_id
+    value:
+      expression: aws_vpc.main.id
+""",
+            ),
+        ]
+    )
+
+    # YAML -> ModuleProjectIR
+    original_ir = parse_yaml_module_project(yaml_project)
+
+    # ModuleProjectIR -> Terraform project
+    terraform_project = generate_terraform_module_project(original_ir)
+
+    # Terraform project -> ModuleProjectIR
+    reparsed_ir = parse_terraform_module_project(terraform_project)
+
+    # Verify root module call
+    assert len(reparsed_ir.project.modules) == 1
+
+    original_module = original_ir.project.modules[0]
+    reparsed_module = reparsed_ir.project.modules[0]
+
+    assert reparsed_module.name == original_module.name
+    assert reparsed_module.source == original_module.source
+    assert reparsed_module.arguments == original_module.arguments
+
+    # Verify child module
+    assert len(reparsed_ir.child_modules) == 1
+
+    original_child = original_ir.child_modules[0]
+    reparsed_child = reparsed_ir.child_modules[0]
+
+    assert reparsed_child.path == original_child.path
+
+    # Verify variable
+    assert len(reparsed_child.project.variables) == 1
+
+    original_variable = original_child.project.variables[0]
+    reparsed_variable = reparsed_child.project.variables[0]
+
+    assert reparsed_variable.name == original_variable.name
+    assert reparsed_variable.default == original_variable.default
+
+    # Verify resource
+    assert len(reparsed_child.project.resources) == 1
+
+    original_resource = original_child.project.resources[0]
+    reparsed_resource = reparsed_child.project.resources[0]
+
+    assert reparsed_resource.type == original_resource.type
+    assert reparsed_resource.name == original_resource.name
+    assert reparsed_resource.attributes["cidr_block"] == original_resource.attributes["cidr_block"]
+
+    # Verify output
+    assert len(reparsed_child.project.outputs) == 1
+
+    original_output = original_child.project.outputs[0]
+    reparsed_output = reparsed_child.project.outputs[0]
+
+    assert reparsed_output.name == original_output.name
+    assert reparsed_output.value.to_string() == original_output.value.value

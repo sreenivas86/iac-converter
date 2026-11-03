@@ -183,6 +183,47 @@ outputs:
 
     assert round_trip_output.name == original_output.name
     assert round_trip_output.value == original_output.value
+    # ---------------------------------------------------------
+    # Terraform IR -> YAML -> ProjectIR
+    # ---------------------------------------------------------
+
+    yaml_after_round_trip = generate_yaml(round_trip_ir)
+    yaml_reparsed_ir = parse_yaml_project(yaml_after_round_trip)
+
+    assert yaml_reparsed_ir.version == original_ir.version
+
+    assert len(yaml_reparsed_ir.providers) == len(original_ir.providers)
+    assert len(yaml_reparsed_ir.variables) == len(original_ir.variables)
+    assert len(yaml_reparsed_ir.resources) == len(original_ir.resources)
+    assert len(yaml_reparsed_ir.outputs) == len(original_ir.outputs)
+
+    # Provider
+    assert yaml_reparsed_ir.providers[0].name == original_ir.providers[0].name
+    assert (
+        yaml_reparsed_ir.providers[0].configuration["region"]
+        == original_ir.providers[0].configuration["region"]
+    )
+
+    # Variable
+    assert yaml_reparsed_ir.variables[0].name == original_ir.variables[0].name
+    assert yaml_reparsed_ir.variables[0].description == original_ir.variables[0].description
+    assert yaml_reparsed_ir.variables[0].default == original_ir.variables[0].default
+
+    # Resource
+    assert yaml_reparsed_ir.resources[0].type == original_ir.resources[0].type
+    assert yaml_reparsed_ir.resources[0].name == original_ir.resources[0].name
+    assert (
+        yaml_reparsed_ir.resources[0].attributes["bucket"]
+        == original_ir.resources[0].attributes["bucket"]
+    )
+    assert (
+        yaml_reparsed_ir.resources[0].attributes["tags"]
+        == original_ir.resources[0].attributes["tags"]
+    )
+
+    # Output
+    assert yaml_reparsed_ir.outputs[0].name == original_ir.outputs[0].name
+    assert yaml_reparsed_ir.outputs[0].value == original_ir.outputs[0].value
 
 
 def test_nested_expressions_survive_yaml_terraform_round_trip() -> None:

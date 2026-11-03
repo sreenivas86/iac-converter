@@ -99,3 +99,27 @@ output "bucket_id" {
     assert 'output "bucket_id"' in generated_contents["outputs.tf"]
 
     assert "value = aws_s3_bucket.data.id" in generated_contents["outputs.tf"]
+    reparsed_project = load_project(output)
+    reparsed_ir = parse_terraform_project(reparsed_project)
+
+    assert len(reparsed_ir.providers) == len(ir.providers)
+    assert len(reparsed_ir.variables) == len(ir.variables)
+    assert len(reparsed_ir.resources) == len(ir.resources)
+    assert len(reparsed_ir.outputs) == len(ir.outputs)
+
+    assert reparsed_ir.providers[0].name == ir.providers[0].name
+    assert reparsed_ir.variables[0].name == ir.variables[0].name
+    assert reparsed_ir.resources[0].type == ir.resources[0].type
+    assert reparsed_ir.resources[0].name == ir.resources[0].name
+    assert reparsed_ir.outputs[0].name == ir.outputs[0].name
+    assert (
+        reparsed_ir.providers[0].configuration["region"] == ir.providers[0].configuration["region"]
+    )
+
+    assert reparsed_ir.variables[0].description == ir.variables[0].description
+
+    assert reparsed_ir.variables[0].default == ir.variables[0].default
+
+    assert reparsed_ir.resources[0].attributes["bucket"] == ir.resources[0].attributes["bucket"]
+
+    assert reparsed_ir.outputs[0].value == ir.outputs[0].value
