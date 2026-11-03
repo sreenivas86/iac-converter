@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from pathlib import PurePosixPath
 from typing import Any
 
 import yaml
 
 from iac_converter.ir import (
     Literal,
+    ModuleProjectIR,
     ModuleReference,
     ProjectFileIR,
     ProjectIR,
@@ -112,6 +114,44 @@ def generate_yaml_project_files(
     if not generated_files:
         raise YAMLProjectGenerationError(
             "No YAML files could be generated from the Terraform project"
+        )
+
+    return Project(files=generated_files)
+
+
+def generate_yaml_module_project(module_project: ModuleProjectIR) -> Project:
+    """
+    Generate a YAML project while preserving root and nested module structure.
+    """
+
+    generated_files: list[ProjectFile] = []
+
+    def add_module_files(module: ModuleProjectIR) -> None:
+        for project_file in module.files:
+            path = PurePosixPath(module.path, project_file.path).as_posix()
+            content = generate_yaml_project(project_file.project)
+
+            if content.strip():
+                generated_files.append(
+                    ProjectFile(path=path.rsplit(".", 1)[0] + ".yaml", content=content)
+                )
+
+        for child_module in module.child_modules:
+            add_module_files(child_module)
+
+    for project_file in module_project.files:
+        content = generate_yaml_project(project_file.project)
+
+        if content.strip():
+            path = project_file.path.rsplit(".", 1)[0] + ".yaml"
+            generated_files.append(ProjectFile(path=path, content=content))
+
+    for child_module in module_project.child_modules:
+        add_module_files(child_module)
+
+    if not generated_files:
+        raise YAMLProjectGenerationError(
+            "No YAML files could be generated from the Terraform module project"
         )
 
     return Project(files=generated_files)

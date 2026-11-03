@@ -1,0 +1,19 @@
+version: "1"
+variables:
+- name: cidr_block
+  type: string
+- name: environment
+  type: string
+resources:
+- type: aws_vpc
+  name: main
+  properties:
+    cidr_block:
+      expression: var.cidr_block
+outputs:
+- name: vpc_id
+  value:
+    reference:
+      resource_type: aws_vpc
+      resource_name: main
+      attribute: id

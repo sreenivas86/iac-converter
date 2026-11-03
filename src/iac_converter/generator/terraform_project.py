@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from pathlib import PurePosixPath
+
 from iac_converter.generator.terraform import TerraformGenerator
-from iac_converter.ir import ProjectFileIR, ProjectIR
+from iac_converter.ir import ModuleProjectIR, ProjectFileIR, ProjectIR
 from iac_converter.project import Project, ProjectFile
 
 
@@ -110,6 +112,7 @@ def generate_terraform_project_files(
 
     Each YAML file becomes a corresponding Terraform file.
     """
+
     generated_files: list[ProjectFile] = []
     generator = TerraformGenerator()
 
@@ -120,7 +123,6 @@ def generate_terraform_project_files(
             continue
 
         terraform_path = path.rsplit(".", 1)[0] + ".tf"
-
         content = generator.generate(project_file.project)
 
         if content.strip():
@@ -137,3 +139,57 @@ def generate_terraform_project_files(
         )
 
     return Project(files=generated_files)
+
+
+def generate_terraform_module_project(
+    module_project: ModuleProjectIR,
+) -> Project:
+    """
+    Generate a Terraform project while preserving module directory structure.
+
+    Each YAML file becomes a corresponding Terraform file.
+    Child modules are generated recursively in their own directories.
+    """
+
+    generated_files: list[ProjectFile] = []
+    _generate_module_files(module_project, generated_files)
+
+    if not generated_files:
+        raise TerraformProjectGenerationError(
+            "No Terraform files could be generated from the YAML module project"
+        )
+
+    return Project(files=generated_files)
+
+
+def _generate_module_files(
+    module_project: ModuleProjectIR,
+    generated_files: list[ProjectFile],
+) -> None:
+    """Generate files for one module and recursively generate child modules."""
+
+    generator = TerraformGenerator()
+
+    for project_file in module_project.files:
+        path = project_file.path
+
+        if not path.lower().endswith((".yaml", ".yml")):
+            continue
+
+        terraform_path = path.rsplit(".", 1)[0] + ".tf"
+
+        if module_project.path:
+            terraform_path = (PurePosixPath(module_project.path) / terraform_path).as_posix()
+
+        content = generator.generate(project_file.project)
+
+        if content.strip():
+            generated_files.append(
+                ProjectFile(
+                    path=terraform_path,
+                    content=content,
+                )
+            )
+
+    for child_module in module_project.child_modules:
+        _generate_module_files(child_module, generated_files)

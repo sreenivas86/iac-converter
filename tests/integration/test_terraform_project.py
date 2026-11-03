@@ -1,5 +1,6 @@
 from iac_converter.compiler.terraform_project import (
     TerraformProjectParseError,
+    parse_terraform_module_project,
     parse_terraform_project,
 )
 from iac_converter.ir import Literal
@@ -188,3 +189,119 @@ output "settings" {
         Literal("ap-south-1"),
         Literal("ap-southeast-1"),
     ]
+
+
+def test_parse_terraform_module_project_separates_root_and_child_module():
+    project = Project(
+        files=[
+            ProjectFile(
+                path="main.tf",
+                content="""
+resource "aws_s3_bucket" "root" {
+  bucket = "root-bucket"
+}
+""",
+            ),
+            ProjectFile(
+                path="modules/vpc/main.tf",
+                content="""
+variable "cidr_block" {
+  type    = string
+  default = "10.0.0.0/16"
+}
+
+resource "aws_vpc" "main" {
+  cidr_block = var.cidr_block
+}
+
+output "vpc_id" {
+  value = aws_vpc.main.id
+}
+""",
+            ),
+        ]
+    )
+
+    result = parse_terraform_module_project(project)
+
+    assert len(result.project.resources) == 1
+    assert result.project.resources[0].name == "root"
+
+    assert len(result.child_modules) == 1
+
+    vpc = result.child_modules[0]
+    assert vpc.path == "modules/vpc"
+    assert len(vpc.project.variables) == 1
+    assert vpc.project.variables[0].name == "cidr_block"
+    assert len(vpc.project.resources) == 1
+    assert vpc.project.resources[0].name == "main"
+    assert len(vpc.project.outputs) == 1
+    assert vpc.project.outputs[0].name == "vpc_id"
+
+
+def test_parse_terraform_module_project_preserves_module_file_paths():
+    project = Project(
+        files=[
+            ProjectFile(
+                path="modules/vpc/main.tf",
+                content="""
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+}
+""",
+            ),
+            ProjectFile(
+                path="modules/vpc/outputs.tf",
+                content="""
+output "vpc_id" {
+  value = aws_vpc.main.id
+}
+""",
+            ),
+        ]
+    )
+
+    result = parse_terraform_module_project(project)
+
+    vpc = result.child_modules[0]
+
+    assert [file.path for file in vpc.files] == ["main.tf", "outputs.tf"]
+
+
+def test_parse_terraform_module_project_supports_nested_modules():
+    project = Project(
+        files=[
+            ProjectFile(
+                path="modules/network/main.tf",
+                content="""
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+}
+""",
+            ),
+            ProjectFile(
+                path="modules/network/modules/subnet/main.tf",
+                content="""
+resource "aws_subnet" "main" {
+  vpc_id     = "vpc-123"
+  cidr_block = "10.0.1.0/24"
+}
+""",
+            ),
+        ]
+    )
+
+    result = parse_terraform_module_project(project)
+
+    assert len(result.child_modules) == 1
+
+    network = result.child_modules[0]
+    assert network.path == "modules/network"
+    assert len(network.project.resources) == 1
+
+    assert len(network.child_modules) == 1
+
+    subnet = network.child_modules[0]
+    assert subnet.path == "modules/network/modules/subnet"
+    assert len(subnet.project.resources) == 1
+    assert subnet.project.resources[0].type == "aws_subnet"

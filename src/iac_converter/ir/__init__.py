@@ -11,6 +11,7 @@ from .expression import (
 )
 from .model import ProjectIR
 from .module import Module
+from .module_project import ModuleProjectIR
 from .output import Output
 from .project_file import ProjectFileIR
 from .provider import Provider
@@ -38,6 +39,7 @@ __all__ = [
     "Literal",
     "LocalReference",
     "Module",
+    "ModuleProjectIR",
     "ModuleReference",
     "Output",
     "ProjectFileIR",

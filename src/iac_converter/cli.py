@@ -6,17 +6,17 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from iac_converter.compiler import (
+    parse_terraform_module_project,
     parse_terraform_project,
-    parse_terraform_project_files,
+    parse_yaml_module_project,
     parse_yaml_project,
-    parse_yaml_project_files,
 )
 from iac_converter.generator import (
     generate_terraform,
+    generate_terraform_module_project,
     generate_terraform_project,
-    generate_terraform_project_files,
+    generate_yaml_module_project,
     generate_yaml_project,
-    generate_yaml_project_files,
 )
 from iac_converter.project import load_project, save_project
 
@@ -91,8 +91,8 @@ def yaml_project_to_terraform(input_path: Path, output_path: Path) -> None:
         terraform_project = generate_terraform_project(project_ir)
     else:
         project = load_project(input_path)
-        parsed_files = parse_yaml_project_files(project)
-        terraform_project = generate_terraform_project_files(parsed_files)
+        module_ir = parse_yaml_module_project(project)
+        terraform_project = generate_terraform_module_project(module_ir)
 
     save_project(terraform_project, output_path)
 
@@ -104,8 +104,8 @@ def terraform_project_to_yaml(input_path: Path, output_path: Path) -> None:
         project_ir = parse_terraform_project(project)
         _write_file(output_path, generate_yaml_project(project_ir))
     else:
-        parsed_files = parse_terraform_project_files(project)
-        yaml_project = generate_yaml_project_files(parsed_files)
+        module_ir = parse_terraform_module_project(project)
+        yaml_project = generate_yaml_module_project(module_ir)
         save_project(yaml_project, output_path)
 
 
