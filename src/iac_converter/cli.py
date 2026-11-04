@@ -421,6 +421,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"Unexpected error: {exc}",
+            file=sys.stderr,
+        )
+
+        if args.verbose:
+            import traceback
+
+            traceback.print_exc()
+
+        return 1
     if not args.quiet:
         if args.verbose:
             print(f"Output written to: {args.output}")

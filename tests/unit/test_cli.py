@@ -571,3 +571,163 @@ def test_cli_validate_quiet(tmp_path: Path, capsys) -> None:
     assert result == 0
     assert captured.out == ""
     assert captured.err == ""
+
+
+def test_cli_returns_error_for_invalid_terraform(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    input_directory = tmp_path / "terraform"
+    input_directory.mkdir()
+
+    input_file = input_directory / "main.tf"
+    output_file = tmp_path / "output.yaml"
+
+    input_file.write_text(
+        'resource "aws_s3_bucket" {\n',
+        encoding="utf-8",
+    )
+
+    result = main(
+        [
+            "terraform-to-yaml",
+            str(input_directory),
+            "--output",
+            str(output_file),
+        ]
+    )
+
+    assert result == 1
+    assert not output_file.exists()
+
+    error = capsys.readouterr().err
+    assert "Error:" in error
+    assert "main.tf" in error
+
+
+def test_cli_handles_unexpected_conversion_error(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    from iac_converter import cli
+
+    input_file = tmp_path / "project.yaml"
+    output_file = tmp_path / "main.tf"
+
+    input_file.write_text(YAML_SOURCE, encoding="utf-8")
+
+    def raise_unexpected_error(source: str):
+        raise RuntimeError("Unexpected conversion failure")
+
+    monkeypatch.setattr(
+        cli,
+        "parse_yaml_project",
+        raise_unexpected_error,
+    )
+
+    result = main(
+        [
+            "yaml-to-terraform",
+            str(input_file),
+            "--output",
+            str(output_file),
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert result == 1
+    assert "Unexpected error:" in captured.err
+    assert "Unexpected conversion failure" in captured.err
+    assert not output_file.exists()
+
+
+def test_cli_verbose_displays_unexpected_error_traceback(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    from iac_converter import cli
+
+    input_file = tmp_path / "project.yaml"
+    output_file = tmp_path / "main.tf"
+
+    input_file.write_text(YAML_SOURCE, encoding="utf-8")
+
+    def raise_unexpected_error(source: str):
+        raise RuntimeError("Unexpected conversion failure")
+
+    monkeypatch.setattr(
+        cli,
+        "parse_yaml_project",
+        raise_unexpected_error,
+    )
+
+    result = main(
+        [
+            "yaml-to-terraform",
+            str(input_file),
+            "--output",
+            str(output_file),
+            "--verbose",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert result == 1
+    assert "Unexpected error:" in captured.err
+    assert "Traceback (most recent call last)" in captured.err
+    assert "RuntimeError: Unexpected conversion failure" in captured.err
+
+
+def test_cli_returns_error_when_input_directory_is_a_file(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    input_file = tmp_path / "not-a-directory.yaml"
+    output_file = tmp_path / "output.yaml"
+
+    input_file.write_text("version: '1'", encoding="utf-8")
+
+    result = main(
+        [
+            "terraform-to-yaml",
+            str(input_file),
+            "--output",
+            str(output_file),
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert result == 1
+    assert "Input path is not a directory" in captured.err
+    assert not output_file.exists()
+
+
+def test_cli_returns_error_when_output_file_path_is_directory(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    input_file = tmp_path / "project.yaml"
+    output_directory = tmp_path / "output"
+
+    input_file.write_text(YAML_SOURCE, encoding="utf-8")
+    output_directory.mkdir()
+
+    result = main(
+        [
+            "yaml-to-terraform",
+            str(input_file),
+            "--output",
+            str(output_directory),
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert result == 1
+    assert "Output path is not a file" in captured.err
+    assert output_directory.is_dir()
