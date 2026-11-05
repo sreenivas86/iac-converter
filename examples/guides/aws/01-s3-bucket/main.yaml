@@ -1,0 +1,18 @@
+﻿version: "1"
+
+terraform:
+  required_version: ">= 1.5.0"
+
+providers:
+  aws:
+    properties:
+      region: us-east-1
+
+resources:
+  - type: aws_s3_bucket
+    name: example
+    properties:
+      bucket: replace-with-your-unique-bucket-name
+      tags:
+        Name: iac-converter-example
+        Environment: development
