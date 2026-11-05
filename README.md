@@ -104,25 +104,99 @@ IAC Converter can use Terraform or OpenTofu for project validation.
 
 ---
 
-## 3. Download the IAC Converter Project
+## 3. Install IAC Converter from PyPI
 
-Open PowerShell.
+IAC Converter is published on the Python Package Index (PyPI). This is the recommended installation method for users who want to use the application without downloading or modifying its source code.
 
-Navigate to the directory where you want to install the project.
+**PyPI project:** https://pypi.org/project/iac-converter/
 
-Clone the repository:
+### 3.1 Prerequisites
+
+- Python 3.11 or newer.
+- pip.
+- An internet connection.
+
+Verify Python and pip:
 
 ```powershell
-git clone <repository-url>
+python --version
+python -m pip --version
 ```
 
-Navigate into the project:
+### 3.2 Create a Virtual Environment
+
+A virtual environment isolates IAC Converter's dependencies from other Python applications.
+
+On Windows PowerShell:
 
 ```powershell
-cd iac-tool
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-Replace `<repository-url>` with the actual Git repository URL.
+If PowerShell blocks activation scripts, allow them for the current session only:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+On Linux or macOS:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3.3 Install from PyPI
+
+Upgrade pip and install the published package:
+
+```powershell
+python -m pip install --upgrade pip
+python -m pip install iac-converter
+```
+
+### 3.4 Verify the Installation
+
+```powershell
+python -m pip show iac-converter
+python -m iac_converter.cli --version
+python -m iac_converter.cli --help
+```
+
+For version `0.1.0`, the version command should display:
+
+```text
+iac-converter 0.1.0
+```
+
+You can now use IAC Converter. The examples in the CLI, validation, and API sections below use `python -m iac_converter.cli`, which avoids depending on a platform-specific console-script launcher.
+
+### 3.5 Optional: Install Terraform or OpenTofu
+
+Terraform and OpenTofu are not required for YAML/Terraform text conversion. Install one of them if you want to use IAC Converter's external validation command.
+
+See Section 2.3 for Terraform installation and Section 2.4 for OpenTofu installation.
+
+---
+
+## 4. Install IAC Converter from GitHub Source
+
+Use this method if you want to inspect, modify, test, or contribute to the source code. For normal use, install from PyPI as described in Section 3.
+
+### 4.1 Clone the Repository
+
+Repository:
+
+https://github.com/sreenivas86/iac-converter
+
+Open PowerShell and run:
+
+```powershell
+git clone https://github.com/sreenivas86/iac-converter.git
+cd iac-converter
+```
 
 Verify the project structure:
 
@@ -133,141 +207,107 @@ Get-ChildItem
 The project should contain files and directories similar to:
 
 ```text
-iac-tool/
-│
+iac-converter/
 ├── src/
 │   └── iac_converter/
-│
 ├── tests/
-│
 ├── examples/
-│
 ├── README.md
 ├── pyproject.toml
 └── .gitignore
 ```
 
----
+### 4.2 Create and Activate a Virtual Environment
 
-## 4. Create the Python Virtual Environment
-
-A virtual environment keeps the project's Python dependencies separate from other applications on your computer.
-
-From the project root directory, execute:
+From the repository root:
 
 ```powershell
 python -m venv .venv
-```
-
-This creates a `.venv` directory.
-
-### 4.1 Activate the Virtual Environment
-
-For Windows PowerShell:
-
-```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-After activation, your PowerShell prompt should show:
-
-```text
-(.venv) PS C:\...\iac-tool>
-```
-
-If PowerShell blocks script execution, use this command for the current PowerShell session:
+If PowerShell blocks activation scripts:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-```
-
-Then activate again:
-
-```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-### 4.2 Upgrade pip
+On Linux or macOS:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 4.3 Install the Source Project
+
+For development, install the project in editable mode with its development dependencies:
 
 ```powershell
 python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
 ```
 
-### 4.3 Install IAC Converter
+This installs the application and development tools declared in `pyproject.toml`, including pytest, Ruff, MyPy, and httpx.
 
-Install the application and its runtime dependencies:
+If you only want to install the source project without development tools, use:
 
 ```powershell
 python -m pip install -e .
 ```
 
-The installation reads the dependencies declared in `pyproject.toml`.
-
-For development work, install the development dependencies too:
-
-```powershell
-python -m pip install -e ".[dev]"
-```
-
-These include pytest, Ruff, MyPy, and other development tools.
-
-### 4.4 Verify Installation
-
-Run:
+### 4.4 Verify the Source Installation
 
 ```powershell
 python -m pip show iac-converter
-```
-
-Check the application version:
-
-```powershell
 python -m iac_converter.cli --version
-```
-
-You should see:
-
-```text
-iac-converter 0.1.0
-```
-
-You can also check the CLI help:
-
-```powershell
 python -m iac_converter.cli --help
 ```
 
+The version command should display the version declared by the checked-out source.
+
+### 4.5 Run Tests
+
+After installing the development dependencies:
+
+```powershell
+python -m pytest
+```
+
+For linting, formatting, and type checking, see Section 13.
+
 ---
 
-## 5. Install from a Built Package
+## 5. Install from a Built Distribution Package
 
-If you already have a release wheel, you can install it without installing the project in editable mode.
+This method is intended for users who have already obtained a wheel or source distribution file, for example from a GitHub Release or a locally built `dist` directory.
 
-For example:
+### 5.1 Install a Wheel
 
 ```powershell
 python -m pip install .\dist\iac_converter-0.1.0-py3-none-any.whl
 ```
 
-To install from a source distribution:
+### 5.2 Install a Source Distribution
 
 ```powershell
 python -m pip install .\dist\iac_converter-0.1.0.tar.gz
 ```
 
-After installation, verify:
+### 5.3 Verify the Installation
 
 ```powershell
 python -m iac_converter.cli --version
 ```
 
-For an eventual published release, the installation command will be:
+For the `0.1.0` release, expected output is:
 
-```powershell
-python -m pip install iac-converter
+```text
+iac-converter 0.1.0
 ```
 
-This last command is applicable once the package has been published to the Python Package Index (PyPI).
+For most users, the simpler PyPI installation in Section 3 is recommended.
 
 ---
 
@@ -279,15 +319,12 @@ A simple YAML configuration looks like this:
 
 ```yaml
 version: "1"
-
 terraform:
   required_version: ">= 1.5.0"
-
 providers:
   aws:
     properties:
       region: us-east-1
-
 resources:
   - type: aws_s3_bucket
     name: example
@@ -424,15 +461,12 @@ Root YAML configuration:
 
 ```yaml
 version: "1"
-
 terraform:
   required_version: ">= 1.5.0"
-
 providers:
   aws:
     properties:
       region: ap-south-1
-
 modules:
   - name: vpc
     source: ./modules/vpc
@@ -445,21 +479,17 @@ Module YAML configuration:
 
 ```yaml
 version: "1"
-
 variables:
   - name: cidr_block
     type: string
-
   - name: environment
     type: string
-
 resources:
   - type: aws_vpc
     name: main
     properties:
       cidr_block:
         expression: var.cidr_block
-
 outputs:
   - name: vpc_id
     value:
@@ -628,10 +658,10 @@ Then activate:
 
 ### ModuleNotFoundError
 
-Make sure the virtual environment is activated and install the project again:
+Make sure your virtual environment is activated. Then install or upgrade IAC Converter from PyPI:
 
 ```powershell
-python -m pip install -e .
+python -m pip install --upgrade iac-converter
 ```
 
 ### iac-converter command is not recognized
