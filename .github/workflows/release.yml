@@ -5,14 +5,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   build-and-release:
     name: Build and publish release
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
 
     steps:
       - name: Check out repository
@@ -24,6 +28,7 @@ jobs:
           python-version: "3.14"
 
       - name: Verify release tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
           python - <<'PY'
@@ -65,7 +70,11 @@ jobs:
       - name: Build distribution packages
         run: python -m build
 
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
       - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: IAC Converter ${{ github.ref_name }}
