@@ -2,6 +2,7 @@ README.md
 pyproject.toml
 src/iac_converter/__init__.py
 src/iac_converter/cli.py
+src/iac_converter/logging_config.py
 src/iac_converter.egg-info/PKG-INFO
 src/iac_converter.egg-info/SOURCES.txt
 src/iac_converter.egg-info/dependency_links.txt
@@ -15,6 +16,8 @@ src/iac_converter/compiler/terraform_project.py
 src/iac_converter/compiler/terraform_to_ir.py
 src/iac_converter/compiler/yaml_project.py
 src/iac_converter/compiler/yaml_to_ir.py
+src/iac_converter/diagnostics/__init__.py
+src/iac_converter/diagnostics/models.py
 src/iac_converter/generator/__init__.py
 src/iac_converter/generator/terraform.py
 src/iac_converter/generator/terraform_project.py
@@ -25,7 +28,10 @@ src/iac_converter/ir/block.py
 src/iac_converter/ir/data_source.py
 src/iac_converter/ir/expression.py
 src/iac_converter/ir/model.py
+src/iac_converter/ir/module.py
+src/iac_converter/ir/module_project.py
 src/iac_converter/ir/output.py
+src/iac_converter/ir/project_file.py
 src/iac_converter/ir/provider.py
 src/iac_converter/ir/reference.py
 src/iac_converter/ir/resource.py
@@ -41,3 +47,5 @@ src/iac_converter/project/writer.py
 src/iac_converter/schema/__init__.py
 src/iac_converter/schema/provider_schema.py
 src/iac_converter/schema/yaml_schema.py
+src/iac_converter/validation/__init__.py
+src/iac_converter/validation/engine.py

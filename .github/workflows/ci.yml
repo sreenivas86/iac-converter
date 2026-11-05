@@ -43,5 +43,98 @@ jobs:
       - name: CLI help check
         run: python -m iac_converter.cli --help
 
+      - name: CLI version check
+        run: python -m iac_converter.cli --version
+
       - name: Run tests
         run: python -m pytest
+
+  linux-installation:
+    name: Linux installation test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Make installer executable
+        run: chmod +x install-iac-converter.sh
+
+      - name: Run Linux installer
+        run: ./install-iac-converter.sh
+
+      - name: Verify installed CLI
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          iac-converter --version
+          iac-converter --help
+
+      - name: Test YAML to Terraform conversion
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          iac-converter yaml-project-to-terraform \
+            examples/aws/nested-module-test-yaml \
+            -o /tmp/iac-converter-linux-output
+
+      - name: Verify generated Terraform files
+        run: |
+          test -f /tmp/iac-converter-linux-output/main.tf
+          test -f /tmp/iac-converter-linux-output/modules/vpc/main.tf
+
+  windows-installation:
+    name: Windows installation test
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Run Windows installer
+        shell: pwsh
+        run: |
+          ./install-iac-converter.ps1
+
+      - name: Verify installed CLI
+        shell: pwsh
+        run: |
+          $Python = Join-Path $PWD ".venv\Scripts\python.exe"
+          & $Python -m iac_converter.cli --version
+          if ($LASTEXITCODE -ne 0) {
+              throw "CLI version check failed"
+          }
+
+          & $Python -m iac_converter.cli --help
+          if ($LASTEXITCODE -ne 0) {
+              throw "CLI help check failed"
+          }
+
+      - name: Test YAML to Terraform conversion
+        shell: pwsh
+        run: |
+          $Python = Join-Path $PWD ".venv\Scripts\python.exe"
+
+          & $Python -m iac_converter.cli yaml-project-to-terraform `
+              .\examples\aws\nested-module-test-yaml `
+              -o "$env:TEMP\iac-converter-windows-output"
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "YAML to Terraform conversion failed"
+          }
+
+          if (!(Test-Path "$env:TEMP\iac-converter-windows-output\main.tf")) {
+              throw "Generated main.tf not found"
+          }
+
+          if (!(Test-Path "$env:TEMP\iac-converter-windows-output\modules\vpc\main.tf")) {
+              throw "Generated nested module main.tf not found"
+          }
