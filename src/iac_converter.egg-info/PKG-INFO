@@ -2,8 +2,18 @@ Metadata-Version: 2.4
 Name: iac-converter
 Version: 0.1.0
 Summary: Bidirectional YAML and Terraform infrastructure converter
+License-Expression: Apache-2.0
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: PyYAML>=6.0
 Requires-Dist: python-hcl2>=4.3
 Requires-Dist: fastapi>=0.149.0
@@ -17,6 +27,7 @@ Requires-Dist: ruff>=0.6; extra == "dev"
 Requires-Dist: mypy>=1.10; extra == "dev"
 Requires-Dist: httpx>=0.27; extra == "dev"
 Requires-Dist: types-PyYAML>=6.0; extra == "dev"
+Dynamic: license-file
 
 # IAC Converter
 
@@ -760,4 +771,22 @@ dist/
 
 ## 15. License
 
-License information has not yet been specified.
+IAC Converter is licensed under the **Apache License, Version 2.0**.
+
+You are permitted to:
+
+- Use IAC Converter for personal and commercial purposes.
+- Modify the source code.
+- Distribute original or modified versions.
+- Include IAC Converter in commercial products.
+- Keep your own modifications private.
+
+When redistributing the software, you must comply with the Apache License 2.0 conditions, including retaining applicable copyright, patent, trademark and attribution notices and providing a copy of the license.
+
+Apache License 2.0 also provides an explicit patent license subject to its terms.
+
+**License:** [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+
+The complete license text is available in the [`LICENSE`](LICENSE) file in the project root.
+
+Copyright and licensing rights remain subject to applicable law and the ownership of the contributions.

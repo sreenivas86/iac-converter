@@ -740,4 +740,22 @@ dist/
 
 ## 15. License
 
-License information has not yet been specified.
+IAC Converter is licensed under the **Apache License, Version 2.0**.
+
+You are permitted to:
+
+- Use IAC Converter for personal and commercial purposes.
+- Modify the source code.
+- Distribute original or modified versions.
+- Include IAC Converter in commercial products.
+- Keep your own modifications private.
+
+When redistributing the software, you must comply with the Apache License 2.0 conditions, including retaining applicable copyright, patent, trademark and attribution notices and providing a copy of the license.
+
+Apache License 2.0 also provides an explicit patent license subject to its terms.
+
+**License:** [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+
+The complete license text is available in the [`LICENSE`](LICENSE) file in the project root.
+
+Copyright and licensing rights remain subject to applicable law and the ownership of the contributions.

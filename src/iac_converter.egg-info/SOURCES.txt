@@ -1,3 +1,4 @@
+LICENSE
 README.md
 pyproject.toml
 src/iac_converter/__init__.py

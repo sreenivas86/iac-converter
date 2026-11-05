@@ -1,0 +1,6 @@
+version: "1"
+resources:
+- type: aws_s3_bucket
+  name: example
+  properties:
+    bucket: sreenu-package-test-bucket
